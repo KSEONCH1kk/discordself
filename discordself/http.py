@@ -274,6 +274,18 @@ class HTTPClient:
         if flags is not None:
             data["flags"] = flags
         data.update(kwargs)
+        
+        # Discord требует, чтобы было либо content, либо embeds, либо files
+        # Проверяем перед добавлением fallback
+        has_content = bool(data.get("content"))
+        has_embeds = bool(data.get("embeds"))
+        if not has_content and not has_embeds and not files:
+            # Если есть embeds, но они пустые, добавим content
+            if embeds and len(embeds) == 0:
+                data["content"] = "\u200b"
+            elif not embeds:
+                data["content"] = "\u200b"
+        
         return await self.request("POST", f"/channels/{channel_id}/messages", json=data)
     
     async def _create_message_with_files(

@@ -189,7 +189,7 @@ class GatewayClient:
             self.heartbeat_task = asyncio.create_task(self._heartbeat_loop())
         
         elif op == GatewayOpcode.HEARTBEAT_ACK:
-            logger.debug("Received HEARTBEAT_ACK")
+            pass
         
         elif op == GatewayOpcode.RECONNECT:
             logger.warning("Gateway requested reconnect")
@@ -209,15 +209,12 @@ class GatewayClient:
             if event_name == "READY":
                 self.session_id = event_data.get("session_id")
            #     logger.info("Received READY event")
-        #        print("🔵 READY event received in Gateway")
+                print("🔵 READY event received in Gateway")
             
-            # Логировать voice события
-            if event_name in ("VOICE_STATE_UPDATE", "VOICE_SERVER_UPDATE"):
-                print(f"🔵 Gateway received {event_name} event")
-            
-       #     print(f"🔵 Gateway.dispatch('{event_name}') - handlers: {len(self.event_handlers.get(event_name, []))}")
-        #    if event_name == "MESSAGE_CREATE":
-        #        print(f"🔵 MESSAGE_CREATE data preview: {event_data.get('content', '')[:50] if event_data else 'None'}")
+            if event_name == "MESSAGE_CREATE":
+                print(f"🔵🔵🔵 Gateway received MESSAGE_CREATE: content={event_data.get('content', '')[:50] if event_data else 'None'}")
+                print(f"🔵🔵🔵 Gateway dispatching to {len(self.event_handlers.get(event_name, []))} handlers")
+                print(f"🔵🔵🔵 Gateway handlers: {[h.__name__ if hasattr(h, '__name__') else str(h) for h in self.event_handlers.get(event_name, [])]}")
             self.dispatch(event_name, event_data)
             self.dispatch("raw_socket_receive", event_name, event_data)
     
@@ -257,7 +254,6 @@ class GatewayClient:
             "d": self.sequence
         }
         await self.send(payload)
-        logger.debug("Sent HEARTBEAT")
     
     async def send(self, payload: Dict):
         """Отправить сообщение в Gateway"""

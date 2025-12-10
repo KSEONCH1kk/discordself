@@ -68,8 +68,6 @@ class VoiceGatewayClient:
         endpoint = endpoint.split(':')[0] if ':' in endpoint else endpoint
         url = f"wss://{endpoint}?v=4"
         
-        logger.info(f"🔌 Connecting to Voice Gateway: {url} (endpoint={self.endpoint})")
-        
         try:
             self.ws = await websockets.connect(url)
             self.running = True
@@ -160,7 +158,6 @@ class VoiceGatewayClient:
         
         if op == VoiceOpcode.HELLO:
             self.heartbeat_interval = event_data.get("heartbeat_interval") / 1000.0
-            logger.info(f"Voice Gateway HELLO, heartbeat interval: {self.heartbeat_interval}s")
             
             # Запустить heartbeat
             if self.heartbeat_task:
@@ -172,13 +169,11 @@ class VoiceGatewayClient:
             self.port = event_data.get("port")
             self.ip = event_data.get("ip")
             self.modes = event_data.get("modes", [])
-            logger.info(f"🎉 Voice Gateway READY event: ssrc={self.ssrc}, ip={self.ip}, port={self.port}, modes={self.modes}")
             
             # Выбрать протокол (будет вызван после UDP discovery)
             # await self._select_protocol()
             
             if self.on_ready:
-                logger.info("📞 Calling on_ready callback...")
                 try:
                     self.on_ready(event_data)
                 except Exception as e:
@@ -188,10 +183,8 @@ class VoiceGatewayClient:
         
         elif op == VoiceOpcode.SESSION_DESCRIPTION:
             self.secret_key = bytes(event_data.get("secret_key", []))
-            logger.info(f"🎉 Voice Gateway SESSION_DESCRIPTION event received, secret_key length={len(self.secret_key)}")
             
             if self.on_session_description:
-                logger.info("📞 Calling on_session_description callback...")
                 try:
                     self.on_session_description(event_data)
                 except Exception as e:
@@ -204,7 +197,7 @@ class VoiceGatewayClient:
                 self.on_speaking(event_data)
         
         elif op == VoiceOpcode.HEARTBEAT_ACK:
-            logger.debug("Voice Gateway HEARTBEAT_ACK")
+            pass
     
     async def _identify(self):
         """Отправить IDENTIFY"""
@@ -218,7 +211,6 @@ class VoiceGatewayClient:
             }
         }
         await self._send(payload)
-        logger.info("Sent Voice Gateway IDENTIFY")
     
     async def _select_protocol(self, local_ip: Optional[str] = None, local_port: Optional[int] = None, mode: Optional[str] = None):
         """Выбрать протокол (как в discord.py)"""
@@ -237,8 +229,6 @@ class VoiceGatewayClient:
             else:
                 mode = self.modes[0] if self.modes else "xsalsa20_poly1305"
         
-        logger.info(f"📤 Preparing SELECT_PROTOCOL: mode={mode}, local_ip={local_ip}, local_port={local_port}, available_modes={self.modes}")
-        
         payload = {
             "op": VoiceOpcode.SELECT_PROTOCOL,
             "d": {
@@ -250,9 +240,7 @@ class VoiceGatewayClient:
                 }
             }
         }
-        logger.info(f"📤 Sending SELECT_PROTOCOL payload: {payload}")
         await self._send(payload)
-        logger.info(f"✅ Sent Voice Gateway SELECT_PROTOCOL: {mode} (ip={local_ip}, port={local_port})")
     
     async def _heartbeat_loop(self):
         """Цикл отправки heartbeat"""
@@ -273,7 +261,6 @@ class VoiceGatewayClient:
             "d": int(time.time() * 1000)
         }
         await self._send(payload)
-        logger.debug("Sent Voice Gateway HEARTBEAT")
     
     async def set_speaking(self, speaking: bool = True, delay: int = 0):
         """Установить статус speaking"""

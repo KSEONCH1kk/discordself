@@ -120,8 +120,10 @@ class Client:
         """Вызвать обработчики события с поддержкой приоритетов"""
         # Обработчики с приоритетами (новые listeners)
         priority_handlers = self._event_handlers.get(event_name, [])
+        print(f"🔵 dispatch({event_name}): priority_handlers={len(priority_handlers)}, event_handlers={len(self.event_handlers.get(event_name, []))}")
         for handler, priority in priority_handlers:
             try:
+                print(f"🔵 Calling priority handler: {handler.__name__ if hasattr(handler, '__name__') else type(handler).__name__}")
                 if asyncio.iscoroutinefunction(handler):
                     asyncio.create_task(handler(*args, **kwargs))
                 else:
@@ -142,13 +144,19 @@ class Client:
         handlers = self.event_handlers.get(event_name, [])
         # Исключить дубликаты (уже обработанные в priority_handlers)
         priority_handler_funcs = {h for h, _ in priority_handlers}
+        print(f"🔵 Calling {len(handlers)} regular handlers, excluding {len(priority_handler_funcs)} priority handlers")
+        print(f"🔵 Handler functions: {[h.__name__ if hasattr(h, '__name__') else str(h) for h in handlers]}")
+        print(f"🔵 Priority handler funcs: {[h.__name__ if hasattr(h, '__name__') else str(h) for h in priority_handler_funcs]}")
         for handler in handlers:
             if handler not in priority_handler_funcs:
                 try:
+                    print(f"🔵🔵🔵 About to call regular handler: {handler.__name__ if hasattr(handler, '__name__') else type(handler).__name__}, id={id(handler)}")
                     if asyncio.iscoroutinefunction(handler):
-                        asyncio.create_task(handler(*args, **kwargs))
+                        task = asyncio.create_task(handler(*args, **kwargs))
+                        print(f"🔵🔵🔵 Created task for handler: {task}")
                     else:
-                        handler(*args, **kwargs)
+                        result = handler(*args, **kwargs)
+                        print(f"🔵🔵🔵 Handler returned: {result}")
                 except Exception as e:
                     logger.error(f"Error in event handler {event_name}: {e}", exc_info=True)
                     # Вызвать on_error если есть
@@ -292,9 +300,11 @@ class Client:
     
     async def _on_message_create(self, data: Dict):
         """Обработчик события MESSAGE_CREATE"""
- #       print(f"🔵 _on_message_create called with content: {data.get('content', '')[:50]}")
+        print(f"🔵🔵🔵 _on_message_create CALLED! Content: {data.get('content', '')[:50]}")
+        print(f"🔵🔵🔵 Message author: {data.get('author', {}).get('id')}, bot: {data.get('author', {}).get('bot', False)}")
         try:
             message = Message(data, self)
+            print(f"🔵🔵🔵 Message object created successfully")
        #     print(f"🔵 Message object created: {message.content[:50] if message.content else 'empty'}")
             
             # Убедиться, что канал закэширован
@@ -318,9 +328,12 @@ class Client:
             if self.cache:
                 self.cache.set_message(str(message.id), data)
             
-        #    print(f"🔵 Dispatching 'message' event to {len(self.event_handlers.get('message', []))} handlers")
-        #    print(f"🔵 Dispatching 'message_create' event to {len(self.event_handlers.get('message_create', []))} handlers")
+            print(f"🔵 Dispatching 'message' event to {len(self.event_handlers.get('message', []))} handlers")
+            print(f"🔵 Dispatching 'message_create' event to {len(self.event_handlers.get('message_create', []))} handlers")
+            print(f"🔵 Message content: {message.content[:50] if message.content else 'None'}")
+            print(f"🔵 About to call dispatch('message')...")
             self.dispatch("message", message)
+            print(f"🔵 dispatch('message') returned")
             self.dispatch("message_create", message)
         except Exception as e:
             print(f"❌ Error in _on_message_create: {e}")
@@ -371,18 +384,13 @@ class Client:
         channel_id = data.get("channel_id")
         session_id = data.get("session_id")
         
-        logger.info(f"🔵 VOICE_STATE_UPDATE received: guild_id={guild_id}, user_id={user_id}, channel_id={channel_id}, session_id={bool(session_id)}")
-        logger.info(f"   Our user_id={self.user.id if self.user else None}, voice_clients={list(self.voice_clients.keys())}")
-        
         # Если это наш пользователь, обновить VoiceClient
         if guild_id and self.user and user_id == self.user.id and guild_id in self.voice_clients:
             voice_client = self.voice_clients[guild_id]
             voice_client.session_id = session_id
-            logger.info(f"✅ Updated voice client session_id: {bool(session_id)}")
             
             # Если канал None, удалить voice client
             if not channel_id:
-                logger.info(f"🔌 Disconnecting voice client (channel_id is None)")
                 if guild_id in self.voice_clients:
                     await self.voice_clients[guild_id].disconnect()
                     del self.voice_clients[guild_id]
@@ -404,8 +412,6 @@ class Client:
         token = data.get("token")
         endpoint = data.get("endpoint")
         
-        logger.info(f"🔵 VOICE_SERVER_UPDATE received for guild {guild_id}: endpoint={endpoint}")
-        
         # Обновить VoiceClient если существует
         if guild_id in self.voice_clients:
             voice_client = self.voice_clients[guild_id]
@@ -415,7 +421,6 @@ class Client:
                 if endpoint.startswith('wss://'):
                     endpoint = endpoint[6:]
                 voice_client.endpoint = endpoint
-            logger.info(f"✅ Updated voice client: endpoint={endpoint}, token={bool(token)}, session_id={bool(voice_client.session_id)}")
         else:
             logger.warning(f"⚠️ VOICE_SERVER_UPDATE received but no voice client for guild {guild_id}")
         

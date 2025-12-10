@@ -61,7 +61,6 @@ class FFmpegPCMAudio(PCMAudioSource):
             )
             self._stdout = self.process.stdout
             self.stream = self._stdout
-            logger.info(f"Started FFmpeg process for {self.source}")
         except FileNotFoundError:
             raise RuntimeError(f"FFmpeg executable '{self.executable}' not found. Please install FFmpeg.")
         except Exception as e:
@@ -90,10 +89,6 @@ class FFmpegPCMAudio(PCMAudioSource):
                 if stderr:
                     logger.warning(f"FFmpeg process ended. stderr: {stderr[:200]}")
             return b''
-        
-        # Если прочитали меньше, чем нужно, это может быть конец файла
-        if len(data) < frame_size:
-            logger.debug(f"Read partial frame: {len(data)}/{frame_size} bytes")
         
         return data
     
@@ -190,7 +185,6 @@ class FFmpegOpusAudio(AudioSource):
                 stderr=subprocess.PIPE
             )
             self._stdout = self.process.stdout
-            logger.info(f"Started FFmpeg Opus process for {self.source}")
             
             # Инициализировать OggStream для парсинга Ogg контейнера
             self._packet_iter = OggStream(self._stdout).iter_packets()

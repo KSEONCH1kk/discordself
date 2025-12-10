@@ -9,7 +9,7 @@ TOKEN = os.getenv("DISCORD_TOKEN", "YOUR_TOKEN_HERE")
 
 # Создать клиент с нужными intents для получения сообщений
 client = Client(
-    token=TOKEN,
+    token="MTQ0MzIzNzUyNTE0MDU0MTQ2MQ.Gq8rd-.ratCR_X2bK2gpNAwpMFCjiRNeRkMgrcBflipL8",
     intents=Intents.GUILDS | Intents.GUILD_MESSAGES | Intents.DIRECT_MESSAGES | Intents.MESSAGE_CONTENT
 )
 

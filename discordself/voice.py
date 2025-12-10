@@ -44,7 +44,6 @@ for path in possible_paths:
     abs_path = os.path.abspath(path)
     if os.path.exists(abs_path):
         opus_dll_path = abs_path
-        logger.info(f"🔍 Found opus.dll at: {opus_dll_path}")
         break
 
 if opus_dll_path:
@@ -57,17 +56,13 @@ if opus_dll_path:
             # Добавить в начало PATH, чтобы Windows нашел DLL первым
             current_path = os.environ.get('PATH', '')
             os.environ['PATH'] = dll_dir + os.pathsep + current_path
-            logger.info(f"✅ Added {dll_dir} to PATH")
         
         # Загрузить DLL напрямую через ctypes
         try:
             opus_dll = ctypes.CDLL(opus_dll_path)
-            logger.info(f"✅ Loaded opus.dll from: {opus_dll_path}")
         except OSError as e:
             logger.warning(f"⚠️ Could not load opus.dll directly: {e}")
             logger.warning("   DLL may be missing dependencies or wrong architecture")
-            import traceback
-            logger.debug(traceback.format_exc())
     except Exception as e:
         logger.warning(f"⚠️ Error preparing opus.dll: {e}")
 
@@ -79,7 +74,6 @@ try:
     if opus_dll_path and hasattr(opuslib, 'load_opus'):
         try:
             opuslib.load_opus(opus_dll_path)
-            logger.info(f"✅ Loaded Opus library via opuslib.load_opus from: {opus_dll_path}")
         except Exception as e:
             logger.warning(f"⚠️ opuslib.load_opus failed: {e}")
     
@@ -89,15 +83,12 @@ try:
         test_encoder = opuslib.Encoder(48000, 2, opuslib.APPLICATION_AUDIO)
         del test_encoder
         OPUS_AVAILABLE = True
-        logger.info("✅ Opus library is working correctly!")
     except Exception as e:
         OPUS_AVAILABLE = False
         logger.error(f"❌ Opus library found but not working: {e}")
         logger.error(f"   DLL path: {opus_dll_path}")
         logger.error("   Make sure opus.dll matches your Python architecture (32/64 bit)")
         logger.error("   And that all DLL dependencies are available")
-        import traceback
-        logger.debug(traceback.format_exc())
     
 except (ImportError, Exception) as e:
     OPUS_AVAILABLE = False
@@ -169,25 +160,19 @@ class VoiceClient:
         if not self.client.user:
             raise RuntimeError("Client user not initialized")
         
-        logger.info(f"Connecting to voice channel {self.channel.id}")
-        
         # Сохранить в voice_clients
         if self.guild:
             self.client.voice_clients[self.guild.id] = self
         
         # Установить voice state через основной Gateway
         await self._update_voice_state(self.channel.id, self_deaf, self_mute)
-        logger.info("Sent VOICE_STATE_UPDATE, waiting for VOICE_SERVER_UPDATE and VOICE_STATE_UPDATE events...")
         
         # Ждать VOICE_SERVER_UPDATE и VOICE_STATE_UPDATE события
         # События будут обработаны в Client._on_voice_server_update и _on_voice_state_update
         # Дать время на получение событий
         for i in range(100):  # Ждать до 10 секунд
             if self.endpoint and self.token and self.session_id:
-                logger.info(f"✅ Received all voice data: endpoint={self.endpoint}, token={bool(self.token)}, session_id={bool(self.session_id)}")
                 break
-            if i % 10 == 0:  # Логировать каждую секунду
-                logger.info(f"⏳ Waiting for voice events... (endpoint={bool(self.endpoint)}, token={bool(self.token)}, session_id={bool(self.session_id)})")
             await asyncio.sleep(0.1)
         
         # Подключиться к Voice Gateway только после получения всех данных
@@ -199,14 +184,12 @@ class VoiceClient:
         if self.endpoint.startswith('wss://'):
             self.endpoint = self.endpoint[6:]
         
-        logger.info("🔌 Connecting to Voice Gateway...")
         await self._connect_voice_gateway()
         
         # Использовать poll_event для синхронного handshake (как в discord.py)
         await self._handshake_voice_gateway()
         
         self.connected = True
-        logger.info(f"✅ Connected to voice channel {self.channel.id}")
     
     async def _update_voice_state(self, channel_id: Optional[int], self_deaf: bool, self_mute: bool):
         """Обновить voice state через Gateway"""
@@ -223,9 +206,7 @@ class VoiceClient:
                         "self_mute": self_mute
                     }
                 }
-                logger.info(f"📤 Sending VOICE_STATE_UPDATE: guild_id={self.guild.id}, channel_id={channel_id}, self_deaf={self_deaf}, self_mute={self_mute}")
                 await shard.gateway.send(payload)
-                logger.info("✅ VOICE_STATE_UPDATE sent successfully")
             else:
                 logger.error("❌ Gateway is None, cannot send VOICE_STATE_UPDATE")
         else:
@@ -245,8 +226,6 @@ class VoiceClient:
                 pass
             self.voice_gateway = None
         
-        logger.info(f"🔌 Creating Voice Gateway Client: endpoint={self.endpoint}, session_id={self.session_id[:10] if self.session_id else None}...")
-        
         self.voice_gateway = VoiceGatewayClient(
             self.endpoint,
             self.token,
@@ -259,17 +238,14 @@ class VoiceClient:
         self.voice_gateway.on_ready = self._on_voice_ready
         self.voice_gateway.on_session_description = self._on_session_description
         
-        logger.info("🔌 Connecting to Voice Gateway...")
         await self.voice_gateway.connect()
     
     async def _handshake_voice_gateway(self):
         """Выполнить handshake с Voice Gateway (как в discord.py)"""
         # Ждать READY (получение IP и порта)
-        logger.info("⏳ Waiting for Voice Gateway READY...")
         while not self.voice_gateway.ip:
             event = await self.voice_gateway.poll_event()
             # Событие уже обработано в _handle_message, просто ждем следующее
-        logger.info(f"✅ Got IP from Voice Gateway: {self.voice_gateway.ip}:{self.voice_gateway.port}")
         
         # Обновить данные из voice_gateway
         self.ssrc = self.voice_gateway.ssrc
@@ -280,26 +256,21 @@ class VoiceClient:
         await self._setup_udp()
         
         # Ждать SESSION_DESCRIPTION (получение secret_key)
-        logger.info("⏳ Waiting for SESSION_DESCRIPTION...")
         while not self.voice_gateway.secret_key:
             event = await self.voice_gateway.poll_event()
             # Событие уже обработано в _handle_message, просто ждем следующее
         
         self.secret_key = self.voice_gateway.secret_key
         self.ready = True
-        logger.info("✅ Voice Gateway handshake complete!")
     
     def _on_voice_ready(self, data: Dict):
         """Обработчик готовности Voice Gateway (для совместимости, но не используется в синхронном handshake)"""
-        logger.info(f"🎉 Voice Gateway READY callback: ssrc={data.get('ssrc')}, ip={data.get('ip')}, port={data.get('port')}")
-        # Данные уже установлены в _handshake_voice_gateway, здесь только логируем
+        # Данные уже установлены в _handshake_voice_gateway
     
     def _on_session_description(self, data: Dict):
         """Обработчик session description"""
-        logger.info(f"🎉 SESSION_DESCRIPTION callback received")
         self.secret_key = bytes(data.get("secret_key", []))
         self.ready = True
-        logger.info(f"✅ Voice Gateway ready for audio! secret_key length={len(self.secret_key) if self.secret_key else 0}")
     
     async def _setup_udp(self):
         """Настроить UDP соединение"""
@@ -310,8 +281,6 @@ class VoiceClient:
         
         self._udp_setup_in_progress = True
         try:
-            logger.info(f"🔌 Setting up UDP socket... (ssrc={self.ssrc}, udp_ip={self.udp_ip}, udp_port={self.udp_port})")
-            
             if not self.ssrc or not self.udp_ip or not self.udp_port:
                 logger.error(f"❌ Missing UDP info: ssrc={self.ssrc}, udp_ip={self.udp_ip}, udp_port={self.udp_port}")
                 return
@@ -319,13 +288,10 @@ class VoiceClient:
             # Создать UDP socket
             self.udp_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.udp_socket.setblocking(False)
-            logger.info("✅ UDP socket created")
             
             # Подключиться к UDP сокету (как в discord.py)
             loop = asyncio.get_event_loop()
-            logger.info(f"🔌 Connecting UDP socket to {self.udp_ip}:{self.udp_port}...")
             await loop.sock_connect(self.udp_socket, (self.udp_ip, self.udp_port))
-            logger.info("✅ UDP socket connected")
             
             # Отправить discovery packet (74 bytes как в discord.py)
             packet = bytearray(74)
@@ -333,18 +299,14 @@ class VoiceClient:
             struct.pack_into('>H', packet, 2, 70)  # Length = 70
             struct.pack_into('>I', packet, 4, self.ssrc)  # SSRC
             
-            logger.info(f"📤 Sending UDP discovery packet...")
             await loop.sock_sendall(self.udp_socket, bytes(packet))
-            logger.info("✅ UDP discovery packet sent")
             
             # Получить ответ (как в discord.py - ожидаем 74 bytes, тип 0x02)
-            logger.info("⏳ Waiting for UDP discovery response...")
             try:
                 data = await asyncio.wait_for(
                     loop.sock_recv(self.udp_socket, 74),
                     timeout=5.0
                 )
-                logger.info(f"📥 Received UDP discovery response, length={len(data)}")
                 
                 if len(data) == 74 and data[1] == 0x02:
                     # IP начинается с 8-го байта и заканчивается первым null
@@ -353,7 +315,6 @@ class VoiceClient:
                     self.local_ip = data[ip_start:ip_end].decode('ascii')
                     # Порт в последних 2 байтах
                     self.local_port = struct.unpack_from('>H', data, len(data) - 2)[0]
-                    logger.info(f"✅ UDP discovery successful: local_ip={self.local_ip}, local_port={self.local_port}")
                 else:
                     raise ValueError(f"Invalid UDP response: length={len(data)}, type={data[1] if len(data) > 1 else 'N/A'}")
             except asyncio.TimeoutError:
@@ -380,7 +341,6 @@ class VoiceClient:
                     mode = self.voice_gateway.modes[0]
                 else:
                     mode = modes[0]
-                    logger.info(f"✅ Selected encryption mode: {mode} (from {len(modes)} supported)")
             else:
                 mode = "xsalsa20_poly1305_lite"
                 logger.warning(f"⚠️ Using default encryption mode: {mode}")
@@ -390,10 +350,8 @@ class VoiceClient:
             
             # Отправить SELECT_PROTOCOL с реальным IP и портом (или дефолтными значениями)
             if self.voice_gateway:
-                logger.info(f"📤 Sending SELECT_PROTOCOL: mode={mode}, local_ip={self.local_ip}, local_port={self.local_port}")
                 try:
                     await self.voice_gateway._select_protocol(self.local_ip, self.local_port, mode)
-                    logger.info("✅ SELECT_PROTOCOL sent successfully")
                 except Exception as e:
                     logger.error(f"❌ Failed to send SELECT_PROTOCOL: {e}", exc_info=True)
                     raise
@@ -464,7 +422,6 @@ class VoiceClient:
         """Воспроизвести аудио источник"""
         # Дождаться готовности
         if not self.ready:
-            logger.info("Waiting for voice client to be ready...")
             timeout = 10.0  # 10 секунд таймаут
             start_time = time.time()
             while not self.ready and (time.time() - start_time) < timeout:
@@ -483,25 +440,23 @@ class VoiceClient:
         # Установить speaking (важно: нужно отправить перед началом отправки аудио)
         if self.voice_gateway:
             await self.voice_gateway.set_speaking(True)
-            logger.info("✅ Sent SPEAKING=true to Voice Gateway")
             # Небольшая задержка, чтобы Discord успел обработать SPEAKING
             await asyncio.sleep(0.1)
         
         # Запустить задачу воспроизведения
         self.audio_task = asyncio.create_task(self._audio_loop(after))
-        logger.info("Started playing audio")
     
     async def _audio_loop(self, after: Optional[Callable] = None):
         """Цикл воспроизведения аудио"""
+        import time
+        
         try:
             # Инициализировать Opus encoder если нужно
             if not self.audio_source.is_opus():
-                logger.info(f"📦 Audio source is not Opus, OPUS_AVAILABLE={OPUS_AVAILABLE}")
                 if OPUS_AVAILABLE:
                     try:
                         import opuslib
                         self.encoder = opuslib.Encoder(48000, 2, opuslib.APPLICATION_AUDIO)
-                        logger.info("✅ Opus encoder initialized successfully")
                     except Exception as e:
                         logger.error(f"❌ Failed to initialize Opus encoder: {e}", exc_info=True)
                         self.encoder = None
@@ -509,22 +464,38 @@ class VoiceClient:
                     logger.error("❌ Opus not available, cannot encode PCM audio! Install opuslib.")
                     self.encoder = None
             
+            # Предварительная буферизация: читаем несколько пакетов перед началом
+            buffer_size = 3  # Буферизуем 3 пакета (60ms)
+            buffer = []
+            for _ in range(buffer_size):
+                data = self.audio_source.read()
+                if not data:
+                    break
+                    buffer.append(data)
+            
             packet_count = 0
+            frame_duration = 0.02  # 20ms для Opus кадров
+            start_time = time.perf_counter()
+            
             while self.playing and self.audio_source:
                 if self.paused:
                     await asyncio.sleep(0.1)
+                    start_time = time.perf_counter() - (packet_count * frame_duration)  # Сбросить время при паузе
                     continue
                 
-                # Прочитать данные
-                data = self.audio_source.read()
-                if not data:
-                    # Проверяем, может быть источник еще не закончился
-                    # Даем небольшую задержку перед окончательным решением
-                    await asyncio.sleep(0.01)
+                # Использовать буферизованные пакеты, если есть
+                if buffer:
+                    data = buffer.pop(0)
+                else:
+                    # Прочитать данные
                     data = self.audio_source.read()
                     if not data:
-                        logger.info(f"📥 No more audio data (read {packet_count} packets total)")
-                        break
+                        # Проверяем, может быть источник еще не закончился
+                        # Даем небольшую задержку перед окончательным решением
+                        await asyncio.sleep(0.01)
+                        data = self.audio_source.read()
+                        if not data:
+                            break
                 
                 # Кодировать в Opus если нужно
                 if not self.audio_source.is_opus():
@@ -532,15 +503,10 @@ class VoiceClient:
                         logger.error("❌ Cannot encode PCM audio: Opus encoder not available!")
                         break
                     try:
-                        original_len = len(data)
                         data = self.encoder.encode(data, 960)  # 20ms frame
-                        if packet_count == 0:
-                            logger.info(f"✅ Encoded first audio packet: {len(data)} bytes (from {original_len} PCM bytes)")
                     except Exception as e:
                         logger.error(f"❌ Opus encoding error: {e}", exc_info=True)
                         break
-                elif packet_count == 0:
-                    logger.info(f"✅ Read first audio packet: {len(data)} bytes (opus={self.audio_source.is_opus()})")
                 
                 # Отправить через UDP
                 try:
@@ -550,11 +516,15 @@ class VoiceClient:
                     logger.error(f"❌ Error sending audio packet #{packet_count}: {e}", exc_info=True)
                     break
                 
-                if packet_count % 50 == 0:  # Логировать каждые 50 пакетов (1 секунда)
-                    logger.debug(f"📤 Sent {packet_count} audio packets")
+                # Точная синхронизация времени для 20ms кадров
+                next_time = start_time + (packet_count * frame_duration)
+                current_time = time.perf_counter()
+                delay = next_time - current_time
                 
-                # Задержка для 20ms кадров
-                await asyncio.sleep(0.02)
+                if delay > 0:
+                    await asyncio.sleep(delay)
+                elif delay < -0.1:  # Если отстаем больше чем на 100ms, сбросить время
+                    start_time = time.perf_counter() - (packet_count * frame_duration)
         
         except Exception as e:
             logger.error(f"Error in audio loop: {e}", exc_info=True)
@@ -662,10 +632,6 @@ class VoiceClient:
             # Обновить счетчики
             self.sequence = (self.sequence + 1) % 65536
             self.timestamp = (self.timestamp + 960) % 4294967296  # 20ms = 960 samples
-            
-            # Логировать первые несколько пакетов для отладки
-            if self.sequence <= 5:
-                logger.info(f"📤 Sent audio packet #{self.sequence}: {len(packet)} bytes (mode={self.encryption_mode}, data_len={len(data)}, encrypted_len={len(encrypted)})")
         
         except Exception as e:
             logger.error(f"❌ Failed to send audio packet: {e}", exc_info=True)
@@ -694,8 +660,6 @@ class VoiceClient:
                 await self.voice_gateway.set_speaking(False)
             except Exception as e:
                 logger.warning(f"Failed to set speaking to False: {e}")
-        
-        logger.info("Stopped playing audio")
     
     async def pause(self):
         """Поставить на паузу"""
@@ -704,7 +668,6 @@ class VoiceClient:
         self.paused = True
         if self.voice_gateway:
             await self.voice_gateway.set_speaking(False)
-        logger.info("Paused audio")
     
     async def resume(self):
         """Возобновить воспроизведение"""
@@ -713,12 +676,10 @@ class VoiceClient:
         self.paused = False
         if self.voice_gateway:
             await self.voice_gateway.set_speaking(True)
-        logger.info("Resumed audio")
     
     def set_volume(self, volume: float):
         """Установить громкость (0.0 - 2.0)"""
         self.volume = max(0.0, min(2.0, volume))
-        logger.info(f"Volume set to {self.volume}")
     
     def get_volume(self) -> float:
         """Получить текущую громкость"""

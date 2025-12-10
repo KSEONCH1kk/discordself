@@ -14,24 +14,57 @@ from .models import Message, User, Member, Guild, Channel, Role, Emoji
 class Context:
     """Контекст выполнения команды"""
     
-    def __init__(self, message: Message, command: 'Command', prefix: str, args: List[str], kwargs: Dict[str, Any]):
+    def __init__(self, message: Message, command: 'Command', prefix: str, args: List[str], kwargs: Dict[str, Any], bot: Optional['Bot'] = None):
         self.message = message
         self.command = command
         self.prefix = prefix
         self.args = args
         self.kwargs = kwargs
-        self.bot = message._client if message._client else None
+        self.bot = bot or (message._client if message._client else None)
         
         # Удобные атрибуты
         self.author = message.author
         self.channel = message.channel
         self.guild = message.guild
-        self.me = self.bot.user if self.bot else None
+        # Получить user из bot (может быть Bot или Client)
+        if self.bot:
+            if hasattr(self.bot, 'user'):
+                self.me = self.bot.user
+            elif hasattr(self.bot, 'client') and hasattr(self.bot.client, 'user'):
+                self.me = self.bot.client.user
+            else:
+                self.me = None
+        else:
+            self.me = None
         
-    async def send(self, content: Optional[str] = None, **kwargs):
+    async def send(self, content: Optional[str] = None, embed: Optional[Any] = None, embeds: Optional[list] = None, **kwargs):
         """Отправить сообщение в канал"""
         if self.channel:
-            return await self.channel.send(content, **kwargs)
+            # Преобразовать embed в embeds если нужно
+            if embed and not embeds:
+                embeds = [embed]
+            # Преобразовать embed объекты в словари и отфильтровать пустые
+            if embeds:
+                embeds_dicts = []
+                for e in embeds:
+                    if hasattr(e, 'to_dict'):
+                        e_dict = e.to_dict()
+                        # Проверить, что embed не пустой (должен иметь хотя бы title, description, fields, или другой контент)
+                        if e_dict and (e_dict.get('title') or e_dict.get('description') or e_dict.get('fields') or e_dict.get('image') or e_dict.get('thumbnail')):
+                            embeds_dicts.append(e_dict)
+                    else:
+                        embeds_dicts.append(e)
+                embeds = embeds_dicts if embeds_dicts else None
+            
+            # Убедиться, что есть либо content, либо embeds (Discord требует хотя бы одно)
+            if not content and (not embeds or len(embeds) == 0):
+                content = "\u200b"  # Zero-width space как fallback
+            
+            # Передать embeds, если они есть
+            if embeds:
+                return await self.channel.send(content=content if content else None, embeds=embeds, **kwargs)
+            else:
+                return await self.channel.send(content=content if content else None, **kwargs)
         raise RuntimeError("Cannot send message: channel is None")
     
     async def reply(self, content: Optional[str] = None, **kwargs):
@@ -269,6 +302,9 @@ class Command:
         self.checks = checks or []
         self.enabled = kwargs.get('enabled', True)
         self.hidden = kwargs.get('hidden', False)
+        # Получить cooldown из kwargs или из атрибута функции
+        self.cooldown = kwargs.get('cooldown', None) or getattr(func, '__cooldown__', None)
+        self._cooldown_buckets: Dict[str, List[float]] = {}
         
         # Парсинг сигнатуры функции
         self.signature = inspect.signature(func)
@@ -307,14 +343,19 @@ class Command:
     
     async def invoke(self, ctx: Context, *args, **kwargs):
         """Вызвать команду"""
+        print(f"🔵 Command.invoke called for '{self.name}'")
         # Проверки
         if not await self.can_run(ctx):
+            print(f"❌ Check failed for command '{self.name}'")
             raise CheckFailure(f"Check failed for command {self.name}")
         
+        print(f"🔵 Command '{self.name}' can run, checking cooldown...")
+        print(f"🔵 Command '{self.name}' cooldown: {self.cooldown}")
         # Cooldown проверка
         if self.cooldown:
             import time
             key = self._get_cooldown_key(ctx)
+            print(f"🔵 Cooldown key: {key}")
             if key:
                 rate, per, _ = self.cooldown
                 now = time.time()
@@ -327,20 +368,29 @@ class Command:
                     t for t in self._cooldown_buckets[key] if now - t < per
                 ]
                 
+                print(f"🔵 Cooldown bucket for '{key}': {len(self._cooldown_buckets[key])}/{rate} uses")
+                
                 # Проверить лимит
                 if len(self._cooldown_buckets[key]) >= rate:
                     retry_after = per - (now - self._cooldown_buckets[key][0])
+                    print(f"❌ Command '{self.name}' on cooldown! Retry after {retry_after:.2f}s")
                     from .exceptions import CommandOnCooldown
                     raise CommandOnCooldown(self, retry_after)
                 
                 # Добавить текущее время
                 self._cooldown_buckets[key].append(now)
+                print(f"🔵 Added cooldown entry for '{key}', now {len(self._cooldown_buckets[key])}/{rate} uses")
         
         # Вызов команды
+        print(f"🔵 Calling command callback '{self.name}'...")
         if asyncio.iscoroutinefunction(self.callback):
-            return await self.callback(ctx, *args, **kwargs)
+            result = await self.callback(ctx, *args, **kwargs)
+            print(f"🔵 Command callback '{self.name}' returned: {result}")
+            return result
         else:
-            return self.callback(ctx, *args, **kwargs)
+            result = self.callback(ctx, *args, **kwargs)
+            print(f"🔵 Command callback '{self.name}' returned: {result}")
+            return result
     
     async def prepare(self, ctx: Context, args: List[str]) -> tuple:
         """Подготовить аргументы для команды"""
@@ -473,9 +523,22 @@ class Bot:
         self.cog_manager = None  # Будет инициализирован при импорте cogs
         
         # Регистрация обработчика сообщений
-        @client.event("message")
-        async def on_message(message: Message):
-            await self.process_commands(message)
+        async def on_message_handler(message: Message):
+            print(f"🔵🔵🔵 Bot.on_message_handler CALLED! Content: {message.content[:50] if message.content else 'None'}")
+            print(f"🔵🔵🔵 Bot.on_message_handler: message.author.id={message.author.id if message.author else 'None'}")
+            try:
+                await self.process_commands(message)
+                print(f"🔵🔵🔵 Bot.on_message_handler: process_commands completed")
+            except Exception as e:
+                print(f"❌❌❌ Error in Bot.on_message_handler: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        # Зарегистрировать обработчик
+        client.event("message")(on_message_handler)
+        print(f"🔵 Bot: Registered message handler '{on_message_handler.__name__}', total handlers: {len(client.event_handlers.get('message', []))}")
+        print(f"🔵 Bot: Handler function: {on_message_handler}")
+        print(f"🔵 Bot: Registered handlers: {[h.__name__ if hasattr(h, '__name__') else str(h) for h in client.event_handlers.get('message', [])]}")
     
     def command(self, name: Optional[str] = None, **kwargs):
         """Декоратор для создания команды"""
@@ -544,11 +607,19 @@ class Bot:
     
     async def process_commands(self, message: Message):
         """Обработать команду из сообщения"""
-        if not message.content or message.author.bot:
+        print(f"🔵 process_commands called: content={message.content[:50] if message.content else 'None'}, author={message.author.id if message.author else 'None'}")
+        if not message.content:
+            print("❌ No content, returning")
             return
         
+        # Для selfbot не пропускать сообщения от самого бота (они могут быть командами)
+        # if message.author.bot:
+        #     return
+        
         prefix = self._get_prefix(message)
+        print(f"🔵 Prefix check: prefix={prefix}, content starts with prefix={message.content.startswith(prefix) if prefix else False}")
         if not prefix:
+            print("❌ No prefix found, returning")
             return
         
         # Удалить префикс
@@ -564,8 +635,13 @@ class Bot:
         if self.case_insensitive:
             command_name = command_name.lower()
         
+        print(f"🔵 Looking for command: '{command_name}'")
+        print(f"🔵 Available commands: {list(self.commands.keys())}")
+        print(f"🔵 Available aliases: {list(self.aliases.keys())}")
+        
         # Найти команду
         command = self.get_command(command_name)
+        print(f"🔵 Command found: {command.name if command else 'None'}")
         if not command:
             # Попытка найти группу
             group = self.groups.get(command_name)
@@ -586,12 +662,20 @@ class Bot:
         
         # Создать контекст
         try:
-            converted_args, converted_kwargs = await command.prepare(Context(message, command, prefix, args, {}), args)
-            ctx = Context(message, command, prefix, args, converted_kwargs)
-            await command.invoke(ctx, *converted_args, **converted_kwargs)
+            print(f"🔵 Preparing command '{command.name}' with args: {args}")
+            converted_args, converted_kwargs = await command.prepare(Context(message, command, prefix, args, {}, bot=self), args)
+            print(f"🔵 Prepared args: {converted_args}, kwargs: {converted_kwargs}")
+            ctx = Context(message, command, prefix, args, converted_kwargs, bot=self)
+            print(f"🔵 Invoking command '{command.name}'...")
+            result = await command.invoke(ctx, *converted_args, **converted_kwargs)
+            print(f"🔵 Command '{command.name}' invoked, result: {result}")
         except CommandError as e:
+            print(f"❌ CommandError in '{command.name}': {e}")
             await message.channel.send(f"❌ {e}") if message.channel else None
         except Exception as e:
+            print(f"❌ Exception in '{command.name}': {e}")
+            import traceback
+            traceback.print_exc()
             # Обработка ошибок команд
             if hasattr(self.client, 'dispatch'):
                 self.client.dispatch('command_error', message, command, e)

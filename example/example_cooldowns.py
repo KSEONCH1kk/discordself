@@ -7,8 +7,8 @@ from discordself.checks import cooldown
 from discordself.exceptions import CommandOnCooldown
 
 client = Client(
-    token="YOUR_TOKEN_HERE",
-    intents=Intents.GUILDS
+    token="MTQ0MzIzNzUyNTE0MDU0MTQ2MQ.Gq8rd-.ratCR_X2bK2gpNAwpMFCjiRNeRkMgrcBflipL8",
+     intents=Intents.GUILDS | Intents.GUILD_MESSAGES | Intents.DIRECT_MESSAGES | Intents.MESSAGE_CONTENT
 )
 
 bot = Bot(client, command_prefix="!")

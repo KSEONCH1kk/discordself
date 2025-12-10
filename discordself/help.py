@@ -48,6 +48,18 @@ class DefaultHelpCommand(HelpCommand):
     def get_bot_mapping(self, ctx: Context) -> Dict:
         """Получить маппинг команд бота"""
         bot = ctx.bot
+        # Если bot - это Client, нужно получить Bot из него
+        if bot and not hasattr(bot, 'commands'):
+            # Попробовать найти Bot через message
+            if hasattr(ctx.message, '_client') and hasattr(ctx.message._client, 'commands'):
+                bot = ctx.message._client
+            else:
+                # Если не нашли, вернуть пустой маппинг
+                return {}
+        
+        if not bot or not hasattr(bot, 'commands'):
+            return {}
+        
         mapping = {}
         
         # Группировать команды по категориям (cogs)
