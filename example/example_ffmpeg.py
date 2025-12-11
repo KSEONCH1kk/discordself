@@ -13,7 +13,7 @@ logging.basicConfig(
 )
 
 client = Client(
-    token="token",
+    token="MTQ0MzIzNzUyNTE0MDU0MTQ2MQ.Gq8rd-.ratCR_X2bK2gpNAwpMFCjiRNeRkMgrcBflipL8",
     intents=Intents.GUILDS | Intents.GUILD_VOICE_STATES
 )
 
@@ -173,7 +173,7 @@ async def main():
         print("Бот запущен!")
         
         # Примеры использования:
-        await play_audio_file("1400425075240472596", "1400430839397093386", "music.mp3")
+        await play_audio_file("1400425075240472596", "1400430839397093386", "music1.mp3")
         
         await asyncio.sleep(3600 * 24)
 

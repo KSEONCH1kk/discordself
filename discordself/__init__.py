@@ -1,5 +1,39 @@
-"""
-Discord Selfbot Library - Полнофункциональная библиотека для Discord selfbot
+"""Discord Selfbot Library - Полнофункциональная библиотека для Discord selfbot.
+
+Этот пакет предоставляет полнофункциональную библиотеку для создания
+Discord selfbot приложений с поддержкой всех основных функций Discord API.
+
+Основные компоненты:
+    - Client: Основной класс для работы с Discord
+    - Models: Модели данных Discord (User, Guild, Channel, Message и т.д.)
+    - Commands: Система команд для ботов
+    - Voice: Поддержка голосовых каналов
+    - Embeds: Создание красивых embed сообщений
+    - Webhooks: Работа с webhooks
+    - Intents: Управление Gateway intents
+    - Exceptions: Исключения библиотеки
+
+Example:
+    ```python
+    from discordself import Client, Intents
+    
+    client = Client(token="YOUR_TOKEN", intents=Intents.GUILD_MESSAGES)
+    
+    @client.event("ready")
+    async def on_ready():
+        print(f"Logged in as {client.user}")
+    
+    @client.event("message_create")
+    async def on_message(message):
+        if message.content == "!hello":
+            await message.channel.send("Hello!")
+    
+    client.run()
+    ```
+
+Warning:
+    Использование selfbot нарушает Terms of Service Discord.
+    Используйте на свой риск.
 """
 
 from .client import Client

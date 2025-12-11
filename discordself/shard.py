@@ -1,4 +1,8 @@
-"""Шардирование для Discord Gateway"""
+"""Шардирование для Discord Gateway.
+
+Этот модуль предоставляет систему шардирования для распределения
+нагрузки между несколькими Gateway соединениями.
+"""
 
 import asyncio
 import logging
@@ -10,7 +14,25 @@ logger = logging.getLogger(__name__)
 
 
 class Shard:
-    """Один шард Gateway соединения"""
+    """Один шард Gateway соединения.
+    
+    Шард представляет одно Gateway соединение, обрабатывающее
+    часть гильдий и событий Discord.
+    
+    Args:
+        shard_id: ID шарда (0-based)
+        shard_count: Общее количество шардов
+        token: Токен Discord аккаунта
+        intents: Intents для Gateway
+    
+    Attributes:
+        shard_id: ID шарда
+        shard_count: Общее количество шардов
+        token: Токен Discord
+        intents: Intents
+        gateway: Gateway клиент
+        running: Запущен ли шард
+    """
     
     def __init__(self, shard_id: int, shard_count: int, token: str, intents: int = 0):
         self.shard_id = shard_id
@@ -21,7 +43,14 @@ class Shard:
         self.running = False
     
     async def connect(self, gateway_url: Optional[str] = None, pending_handlers: Optional[Dict] = None):
-        """Подключить шард"""
+        """Подключить шард к Gateway.
+        
+        Создает Gateway соединение и применяет обработчики событий.
+        
+        Args:
+            gateway_url: URL Gateway (опционально, будет получен автоматически)
+            pending_handlers: Словарь обработчиков событий для применения
+        """
         self.gateway = GatewayClient(self.token, self.intents)
         self.gateway.shard_id = self.shard_id
         self.gateway.shard_count = self.shard_count
@@ -40,20 +69,47 @@ class Shard:
         self.running = True
     
     async def disconnect(self):
-        """Отключить шард"""
+        """Отключить шард от Gateway.
+        
+        Закрывает Gateway соединение и останавливает шард.
+        """
         self.running = False
         if self.gateway:
             await self.gateway.disconnect()
     
     def get_gateway(self) -> GatewayClient:
-        """Получить Gateway клиент"""
+        """Получить Gateway клиент шарда.
+        
+        Returns:
+            GatewayClient: Gateway клиент или None если не подключен
+        
+        Raises:
+            RuntimeError: Если шард не подключен
+        """
         if not self.gateway:
             raise ShardException(f"Shard {self.shard_id} is not connected")
         return self.gateway
 
 
 class ShardManager:
-    """Менеджер шардов"""
+    """Менеджер шардов для управления несколькими Gateway соединениями.
+    
+    Управляет созданием, подключением и отключением нескольких шардов
+    для распределения нагрузки между Gateway соединениями.
+    
+    Args:
+        token: Токен Discord аккаунта
+        shard_count: Количество шардов (по умолчанию: 1)
+        intents: Intents для Gateway
+    
+    Attributes:
+        token: Токен Discord
+        shard_count: Количество шардов
+        intents: Intents
+        shards: Список шардов
+        gateway_url: URL Gateway
+        _pending_handlers: Обработчики событий для будущих шардов
+    """
     
     def __init__(self, token: str, shard_count: int = 1, intents: int = 0):
         self.token = token
@@ -64,7 +120,13 @@ class ShardManager:
         self._pending_handlers: Dict[str, List] = {}
     
     async def start(self, gateway_url: Optional[str] = None):
-        """Запустить все шарды"""
+        """Запустить все шарды.
+        
+        Создает и подключает все шарды к Gateway с задержкой между подключениями.
+        
+        Args:
+            gateway_url: URL Gateway (опционально, будет получен автоматически)
+        """
         self.gateway_url = gateway_url
         
         # Создать шарды
@@ -90,7 +152,10 @@ class ShardManager:
                 traceback.print_exc()
     
     async def stop(self):
-        """Остановить все шарды"""
+        """Остановить все шарды.
+        
+        Отключает все шарды от Gateway.
+        """
         for shard in self.shards:
             try:
                 await shard.disconnect()
@@ -99,18 +164,44 @@ class ShardManager:
                 logger.error(f"Failed to disconnect shard {shard.shard_id}: {e}")
     
     def get_shard(self, shard_id: int) -> Shard:
-        """Получить шард по ID"""
+        """Получить шард по ID.
+        
+        Args:
+            shard_id: ID шарда
+        
+        Returns:
+            Shard: Объект шарда
+        
+        Raises:
+            ShardException: Если шард не существует
+        """
         if shard_id >= len(self.shards):
             raise ShardException(f"Shard {shard_id} does not exist")
         return self.shards[shard_id]
     
     def get_shard_for_guild(self, guild_id: int) -> Shard:
-        """Получить шард для гильдии"""
+        """Получить шард для гильдии.
+        
+        Вычисляет, какой шард обрабатывает указанную гильдию.
+        
+        Args:
+            guild_id: ID гильдии
+        
+        Returns:
+            Shard: Шард, обрабатывающий гильдию
+        """
         shard_id = (guild_id >> 22) % self.shard_count
         return self.get_shard(shard_id)
     
     def register_event_handler(self, event_name: str, handler):
-        """Зарегистрировать обработчик события для всех шардов"""
+        """Зарегистрировать обработчик события для всех шардов.
+        
+        Регистрирует обработчик для всех существующих и будущих шардов.
+        
+        Args:
+            event_name: Имя события
+            handler: Обработчик события
+        """
         # Сохранить для будущих шардов
         if event_name not in self._pending_handlers:
             self._pending_handlers[event_name] = []
@@ -122,7 +213,14 @@ class ShardManager:
                 shard.gateway.event(event_name)(handler)
     
     def register_event_handler_for_all(self, event_name: str, handler):
-        """Зарегистрировать обработчик события для всех будущих шардов"""
+        """Зарегистрировать обработчик события для всех будущих шардов.
+        
+        Сохраняет обработчик для применения к новым шардам при их создании.
+        
+        Args:
+            event_name: Имя события
+            handler: Обработчик события
+        """
         # Сохранить обработчик для будущих шардов
         if not hasattr(self, '_pending_handlers'):
             self._pending_handlers = {}

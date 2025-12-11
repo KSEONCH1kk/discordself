@@ -1,11 +1,68 @@
-"""Утилиты для работы с permissions Discord"""
+"""Утилиты для работы с permissions Discord.
+
+Этот модуль предоставляет классы и функции для работы
+с правами доступа в Discord гильдиях.
+"""
 
 from typing import List, Set, Optional, Union
 from enum import IntFlag
 
 
 class Permissions(IntFlag):
-    """Флаги permissions Discord"""
+    """Флаги permissions Discord.
+    
+    Представляет все возможные права доступа в Discord гильдиях.
+    Используется для проверки и установки прав ролей и участников.
+    
+    Attributes:
+        CREATE_INSTANT_INVITE: Создание приглашений (1 << 0)
+        KICK_MEMBERS: Исключение участников (1 << 1)
+        BAN_MEMBERS: Бан участников (1 << 2)
+        ADMINISTRATOR: Администратор (все права) (1 << 3)
+        MANAGE_CHANNELS: Управление каналами (1 << 4)
+        MANAGE_GUILD: Управление гильдией (1 << 5)
+        ADD_REACTIONS: Добавление реакций (1 << 6)
+        VIEW_AUDIT_LOG: Просмотр журнала аудита (1 << 7)
+        PRIORITY_SPEAKER: Приоритетный спикер (1 << 8)
+        STREAM: Стрим (1 << 9)
+        VIEW_CHANNEL: Просмотр канала (1 << 10)
+        SEND_MESSAGES: Отправка сообщений (1 << 11)
+        SEND_TTS_MESSAGES: Отправка TTS сообщений (1 << 12)
+        MANAGE_MESSAGES: Управление сообщениями (1 << 13)
+        EMBED_LINKS: Встраивание ссылок (1 << 14)
+        ATTACH_FILES: Прикрепление файлов (1 << 15)
+        READ_MESSAGE_HISTORY: Чтение истории сообщений (1 << 16)
+        MENTION_EVERYONE: Упоминание @everyone (1 << 17)
+        USE_EXTERNAL_EMOJIS: Использование внешних эмодзи (1 << 18)
+        VIEW_GUILD_INSIGHTS: Просмотр аналитики гильдии (1 << 19)
+        CONNECT: Подключение к голосовому каналу (1 << 20)
+        SPEAK: Говорить в голосовом канале (1 << 21)
+        MUTE_MEMBERS: Заглушение участников (1 << 22)
+        DEAFEN_MEMBERS: Глушение участников (1 << 23)
+        MOVE_MEMBERS: Перемещение участников (1 << 24)
+        USE_VAD: Использование VAD (1 << 25)
+        CHANGE_NICKNAME: Изменение своего ника (1 << 26)
+        MANAGE_NICKNAMES: Управление никами (1 << 27)
+        MANAGE_ROLES: Управление ролями (1 << 28)
+        MANAGE_WEBHOOKS: Управление webhooks (1 << 29)
+        MANAGE_EMOJIS_AND_STICKERS: Управление эмодзи и стикерами (1 << 30)
+        USE_APPLICATION_COMMANDS: Использование команд приложения (1 << 31)
+        REQUEST_TO_SPEAK: Запрос на выступление (1 << 32)
+        MANAGE_EVENTS: Управление событиями (1 << 33)
+        MANAGE_THREADS: Управление нитями (1 << 34)
+        CREATE_PUBLIC_THREADS: Создание публичных нитей (1 << 35)
+        CREATE_PRIVATE_THREADS: Создание приватных нитей (1 << 36)
+        USE_EXTERNAL_STICKERS: Использование внешних стикеров (1 << 37)
+        SEND_MESSAGES_IN_THREADS: Отправка сообщений в нитях (1 << 38)
+        USE_EMBEDDED_ACTIVITIES: Использование встроенных активностей (1 << 39)
+        MODERATE_MEMBERS: Модерация участников (1 << 40)
+        VIEW_CREATOR_MONETIZATION_ANALYTICS: Просмотр аналитики монетизации (1 << 41)
+        USE_SOUNDBOARD: Использование звуковой панели (1 << 42)
+        CREATE_GUILD_EXPRESSIONS: Создание выражений гильдии (1 << 43)
+        CREATE_EVENTS: Создание событий (1 << 44)
+        USE_EXTERNAL_SOUNDS: Использование внешних звуков (1 << 45)
+        SEND_VOICE_MESSAGES: Отправка голосовых сообщений (1 << 46)
+    """
     # Общие permissions
     CREATE_INSTANT_INVITE = 1 << 0
     KICK_MEMBERS = 1 << 1
@@ -57,23 +114,49 @@ class Permissions(IntFlag):
 
 
 class PermissionCalculator:
-    """Калькулятор для работы с permissions"""
+    """Калькулятор для работы с permissions Discord.
+    
+    Предоставляет статические методы для преобразования, проверки
+    и вычисления прав доступа в Discord гильдиях.
+    """
     
     @staticmethod
     def from_value(value: Union[int, str]) -> Permissions:
-        """Создать Permissions из числового значения"""
+        """Создать Permissions из числового значения.
+        
+        Args:
+            value: Числовое значение прав (int или str)
+        
+        Returns:
+            Permissions: Объект Permissions
+        """
         if isinstance(value, str):
             value = int(value)
         return Permissions(value)
     
     @staticmethod
     def to_value(permissions: Permissions) -> int:
-        """Преобразовать Permissions в числовое значение"""
+        """Преобразовать Permissions в числовое значение.
+        
+        Args:
+            permissions: Объект Permissions
+        
+        Returns:
+            int: Числовое значение прав
+        """
         return int(permissions)
     
     @staticmethod
     def has_permission(permissions: Union[int, str, Permissions], permission: Permissions) -> bool:
-        """Проверить наличие конкретного permission"""
+        """Проверить наличие конкретного permission.
+        
+        Args:
+            permissions: Права для проверки (int, str или Permissions)
+            permission: Право для проверки
+        
+        Returns:
+            bool: True если право есть (или есть ADMINISTRATOR), False иначе
+        """
         if isinstance(permissions, (int, str)):
             permissions = PermissionCalculator.from_value(permissions)
         
@@ -85,7 +168,15 @@ class PermissionCalculator:
     
     @staticmethod
     def has_any_permission(permissions: Union[int, str, Permissions], *permission_list: Permissions) -> bool:
-        """Проверить наличие хотя бы одного permission"""
+        """Проверить наличие хотя бы одного permission.
+        
+        Args:
+            permissions: Права для проверки (int, str или Permissions)
+            *permission_list: Список прав для проверки
+        
+        Returns:
+            bool: True если есть хотя бы одно право, False иначе
+        """
         if isinstance(permissions, (int, str)):
             permissions = PermissionCalculator.from_value(permissions)
         
@@ -97,7 +188,15 @@ class PermissionCalculator:
     
     @staticmethod
     def has_all_permissions(permissions: Union[int, str, Permissions], *permission_list: Permissions) -> bool:
-        """Проверить наличие всех permissions"""
+        """Проверить наличие всех permissions.
+        
+        Args:
+            permissions: Права для проверки (int, str или Permissions)
+            *permission_list: Список прав для проверки
+        
+        Returns:
+            bool: True если есть все права, False иначе
+        """
         if isinstance(permissions, (int, str)):
             permissions = PermissionCalculator.from_value(permissions)
         
@@ -109,28 +208,59 @@ class PermissionCalculator:
     
     @staticmethod
     def add_permission(permissions: Union[int, str, Permissions], permission: Permissions) -> Permissions:
-        """Добавить permission"""
+        """Добавить permission к существующим правам.
+        
+        Args:
+            permissions: Текущие права (int, str или Permissions)
+            permission: Право для добавления
+        
+        Returns:
+            Permissions: Новые права с добавленным правом
+        """
         if isinstance(permissions, (int, str)):
             permissions = PermissionCalculator.from_value(permissions)
         return permissions | permission
     
     @staticmethod
     def remove_permission(permissions: Union[int, str, Permissions], permission: Permissions) -> Permissions:
-        """Удалить permission"""
+        """Удалить permission из существующих прав.
+        
+        Args:
+            permissions: Текущие права (int, str или Permissions)
+            permission: Право для удаления
+        
+        Returns:
+            Permissions: Новые права без удаленного права
+        """
         if isinstance(permissions, (int, str)):
             permissions = PermissionCalculator.from_value(permissions)
         return permissions & ~permission
     
     @staticmethod
     def toggle_permission(permissions: Union[int, str, Permissions], permission: Permissions) -> Permissions:
-        """Переключить permission"""
+        """Переключить permission (добавить если нет, удалить если есть).
+        
+        Args:
+            permissions: Текущие права (int, str или Permissions)
+            permission: Право для переключения
+        
+        Returns:
+            Permissions: Новые права с переключенным правом
+        """
         if isinstance(permissions, (int, str)):
             permissions = PermissionCalculator.from_value(permissions)
         return permissions ^ permission
     
     @staticmethod
     def get_permission_list(permissions: Union[int, str, Permissions]) -> List[str]:
-        """Получить список всех активных permissions"""
+        """Получить список всех активных permissions.
+        
+        Args:
+            permissions: Права для анализа (int, str или Permissions)
+        
+        Returns:
+            List[str]: Список названий активных прав
+        """
         if isinstance(permissions, (int, str)):
             permissions = PermissionCalculator.from_value(permissions)
         
@@ -142,7 +272,19 @@ class PermissionCalculator:
     
     @staticmethod
     def calculate_overwrite(base: Union[int, str, Permissions], allow: Union[int, str, Permissions], deny: Union[int, str, Permissions]) -> Permissions:
-        """Вычислить итоговые permissions с учетом overwrites"""
+        """Вычислить итоговые permissions с учетом overwrites.
+        
+        Вычисляет итоговые права на основе базовых прав, разрешенных
+        и запрещенных прав из overwrites канала.
+        
+        Args:
+            base: Базовые права (int, str или Permissions)
+            allow: Разрешенные права из overwrite (int, str или Permissions)
+            deny: Запрещенные права из overwrite (int, str или Permissions)
+        
+        Returns:
+            Permissions: Итоговые права
+        """
         if isinstance(base, (int, str)):
             base = PermissionCalculator.from_value(base)
         if isinstance(allow, (int, str)):

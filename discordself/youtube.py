@@ -1,4 +1,7 @@
-"""YouTube и URL audio streaming"""
+"""YouTube и URL audio streaming для DiscordSelf.
+
+Этот модуль предоставляет классы для воспроизведения аудио из YouTube и других URL источников.
+"""
 
 import asyncio
 import re
@@ -17,7 +20,28 @@ except ImportError:
 
 
 class YouTubeSource(FFmpegPCMAudio):
-    """Аудио источник из YouTube"""
+    """Аудио источник из YouTube видео.
+    
+    Этот класс позволяет воспроизводить аудио из YouTube видео в Discord голосовых каналах.
+    Использует yt-dlp для извлечения аудио потока и FFmpeg для декодирования.
+    
+    Args:
+        url: URL YouTube видео или плейлиста
+        ytdl_options: Опции для yt-dlp (по умолчанию: оптимальные настройки для аудио)
+        before_options: FFmpeg опции перед входом (по умолчанию: reconnect опции)
+        options: FFmpeg опции (по умолчанию: None)
+        sample_rate: Частота дискретизации в Hz (по умолчанию: 48000)
+        channels: Количество каналов (по умолчанию: 2)
+    
+    Raises:
+        RuntimeError: Если yt-dlp не установлен или не удалось извлечь аудио URL
+    
+    Example:
+        ```python
+        source = YouTubeSource("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+        voice_client.play(source)
+        ```
+    """
     
     def __init__(self, url: str, *, ytdl_options: Optional[Dict] = None, 
                  before_options: Optional[str] = None, options: Optional[str] = None,
@@ -55,7 +79,17 @@ class YouTubeSource(FFmpegPCMAudio):
         )
     
     def _get_audio_url(self) -> str:
-        """Получить URL аудио потока из YouTube"""
+        """Получить URL аудио потока из YouTube.
+        
+        Извлекает информацию о видео через yt-dlp и возвращает прямой URL
+        к аудио потоку для воспроизведения.
+        
+        Returns:
+            str: URL аудио потока
+            
+        Raises:
+            RuntimeError: Если не удалось извлечь аудио URL
+        """
         ydl = yt_dlp.YoutubeDL(self.ytdl_options)
         
         try:
@@ -82,7 +116,27 @@ class YouTubeSource(FFmpegPCMAudio):
 
 
 class URLSource(FFmpegPCMAudio):
-    """Аудио источник из URL"""
+    """Аудио источник из прямого URL.
+    
+    Этот класс позволяет воспроизводить аудио из прямого URL (не YouTube).
+    Использует FFmpeg для декодирования аудио потока.
+    
+    Args:
+        url: Прямой URL к аудио потоку
+        before_options: FFmpeg опции перед входом (по умолчанию: reconnect опции)
+        options: FFmpeg опции (по умолчанию: None)
+        sample_rate: Частота дискретизации в Hz (по умолчанию: 48000)
+        channels: Количество каналов (по умолчанию: 2)
+    
+    Raises:
+        ValueError: Если URL является YouTube ссылкой (используйте YouTubeSource)
+    
+    Example:
+        ```python
+        source = URLSource("https://example.com/audio.mp3")
+        voice_client.play(source)
+        ```
+    """
     
     def __init__(self, url: str, *, before_options: Optional[str] = None,
                  options: Optional[str] = None, sample_rate: int = 48000, channels: int = 2):
@@ -107,11 +161,45 @@ class URLSource(FFmpegPCMAudio):
 
 
 async def create_yt_source(url: str, **kwargs) -> YouTubeSource:
-    """Создать YouTube источник (async wrapper)"""
+    """Создать YouTube источник (async wrapper).
+    
+    Асинхронная обертка для создания YouTubeSource. Полезно для использования
+    в async контексте, хотя создание источника само по себе синхронное.
+    
+    Args:
+        url: URL YouTube видео
+        **kwargs: Дополнительные аргументы для YouTubeSource
+    
+    Returns:
+        YouTubeSource: Созданный источник аудио
+    
+    Example:
+        ```python
+        source = await create_yt_source("https://www.youtube.com/watch?v=...")
+        voice_client.play(source)
+        ```
+    """
     return YouTubeSource(url, **kwargs)
 
 
 async def create_url_source(url: str, **kwargs) -> URLSource:
-    """Создать URL источник (async wrapper)"""
+    """Создать URL источник (async wrapper).
+    
+    Асинхронная обертка для создания URLSource. Полезно для использования
+    в async контексте, хотя создание источника само по себе синхронное.
+    
+    Args:
+        url: Прямой URL к аудио потоку
+        **kwargs: Дополнительные аргументы для URLSource
+    
+    Returns:
+        URLSource: Созданный источник аудио
+    
+    Example:
+        ```python
+        source = await create_url_source("https://example.com/audio.mp3")
+        voice_client.play(source)
+        ```
+    """
     return URLSource(url, **kwargs)
 

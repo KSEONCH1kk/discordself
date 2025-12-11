@@ -1,4 +1,8 @@
-"""Rate-limit менеджер для Discord API"""
+"""Rate-limit менеджер для Discord API.
+
+Этот модуль предоставляет систему управления rate limits
+для предотвращения превышения лимитов запросов к Discord API.
+"""
 
 import time
 import asyncio
@@ -10,7 +14,16 @@ logger = logging.getLogger(__name__)
 
 
 class RateLimiter:
-    """Менеджер rate limits для Discord API"""
+    """Менеджер rate limits для Discord API.
+    
+    Управляет rate limits для различных маршрутов Discord API,
+    используя bucket-based систему для оптимального распределения запросов.
+    
+    Attributes:
+        buckets: Словарь bucket'ов для различных маршрутов
+        global_ratelimit: Глобальный rate limit (если активен)
+        lock: Асинхронная блокировка для потокобезопасности
+    """
     
     def __init__(self):
         self.buckets: Dict[str, 'Bucket'] = {}
@@ -18,7 +31,21 @@ class RateLimiter:
         self.lock = asyncio.Lock()
     
     async def acquire(self, route: str, method: str = "GET"):
-        """Получить разрешение на выполнение запроса"""
+        """Получить разрешение на выполнение запроса.
+        
+        Блокирует выполнение до тех пор, пока не будет разрешено
+        выполнить запрос согласно rate limits.
+        
+        Args:
+            route: Маршрут API (например, "/channels/{id}/messages")
+            method: HTTP метод (GET, POST, PUT, DELETE и т.д.)
+        
+        Example:
+            ```python
+            await ratelimiter.acquire("/channels/123/messages", "POST")
+            # Теперь можно выполнить запрос
+            ```
+        """
         async with self.lock:
             # Проверка глобального rate limit
             if self.global_ratelimit:
@@ -39,7 +66,16 @@ class RateLimiter:
             await bucket.acquire()
     
     def update_ratelimit(self, route: str, method: str, headers: Dict):
-        """Обновить информацию о rate limit из заголовков ответа"""
+        """Обновить информацию о rate limit из заголовков ответа.
+        
+        Парсит заголовки ответа Discord API и обновляет информацию
+        о rate limits для соответствующего bucket.
+        
+        Args:
+            route: Маршрут API
+            method: HTTP метод
+            headers: Заголовки HTTP ответа
+        """
         bucket_key = self._get_bucket_key(route, method)
         bucket = self.buckets.get(bucket_key)
         
@@ -68,7 +104,18 @@ class RateLimiter:
             bucket.remaining = int(remaining)
     
     def _get_bucket_key(self, route: str, method: str) -> str:
-        """Получить ключ bucket для маршрута"""
+        """Получить ключ bucket для маршрута.
+        
+        Создает ключ bucket на основе маршрута и метода,
+        заменяя ID на плейсхолдеры для группировки похожих маршрутов.
+        
+        Args:
+            route: Маршрут API
+            method: HTTP метод
+        
+        Returns:
+            str: Ключ bucket
+        """
         # Упрощенная логика bucket key
         # В реальности Discord использует более сложную логику
         route = route.replace('/api/v10', '')
@@ -87,7 +134,22 @@ class RateLimiter:
 
 
 class Bucket:
-    """Bucket для rate limiting"""
+    """Bucket для rate limiting.
+    
+    Представляет отдельный bucket для управления rate limit
+    для группы похожих маршрутов API.
+    
+    Attributes:
+        key: Уникальный ключ bucket
+        limit: Максимальное количество запросов
+        remaining: Оставшееся количество запросов
+        reset_after: Время до сброса в секундах
+        reset_at: Временная метка сброса
+        lock: Асинхронная блокировка
+    
+    Args:
+        key: Уникальный ключ bucket
+    """
     
     def __init__(self, key: str):
         self.key = key
@@ -98,7 +160,11 @@ class Bucket:
         self.lock = asyncio.Lock()
     
     async def acquire(self):
-        """Получить разрешение на запрос"""
+        """Получить разрешение на запрос.
+        
+        Блокирует выполнение до тех пор, пока не будет доступно
+        место в bucket для выполнения запроса.
+        """
         async with self.lock:
             current_time = time.time()
             
