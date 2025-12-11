@@ -21,7 +21,7 @@ bot = Bot(client, command_prefix="!")
 @bot.command(name="ping")
 async def ping_command(ctx: Context):
     """Проверка работы бота"""
-    await ctx.send("🏓 Pong!")
+    await ctx.send("Pong!")
 
 
 # Пример 2: Команда с аргументами
@@ -89,7 +89,7 @@ bot.cog_manager.add_cog(AdminCog(bot))
 # Пример 7: Использование listeners
 @client.listen("ready")
 async def on_ready():
-    print(f"✅ Бот готов: {client.user}")
+    print(f"Бот готов: {client.user}")
 
 
 @client.listen("message", priority=1)
@@ -101,7 +101,7 @@ async def on_message_high_priority(message):
 
 async def main():
     async with client:
-        print("🚀 Бот запущен!")
+        print("Бот запущен!")
         await asyncio.sleep(3600 * 24)
 
 
