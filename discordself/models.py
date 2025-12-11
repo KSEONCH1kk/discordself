@@ -2,7 +2,7 @@
 
 from typing import Dict, Optional, List, Any, Callable
 from datetime import datetime
-from .enums import ChannelType, MessageType, Status
+from .enums import ChannelType, MessageType, Status, InteractionType, InteractionResponseType
 
 
 class BaseModel:
@@ -235,7 +235,9 @@ class Message(BaseModel):
         self.mention_everyone = data.get("mention_everyone", False)
         self.mentions = [User(m, client) for m in data.get("mentions", [])]
         self.mention_roles = [int(r) for r in data.get("mention_roles", [])]
-        self.attachments = data.get("attachments", [])
+        # Преобразовать attachments в объекты Attachment
+        attachments_data = data.get("attachments", [])
+        self.attachments = [Attachment(att, client) for att in attachments_data] if attachments_data else []
         self.embeds = data.get("embeds", [])
         self.reactions = data.get("reactions", [])
         self.nonce = data.get("nonce")
@@ -432,4 +434,353 @@ class VoiceState(BaseModel):
     
     def __repr__(self) -> str:
         return f"<VoiceState user_id={self.user_id} channel_id={self.channel_id}>"
+
+
+class Interaction(BaseModel):
+    """Модель Interaction (включая Modals)"""
+    
+    def __init__(self, data: Dict, client=None):
+        super().__init__(data, client)
+        self.id = int(data.get("id", 0))
+        self.application_id = int(data.get("application_id", 0))
+        self.type = InteractionType(data.get("type", 0))
+        self.token = data.get("token", "")
+        self.guild_id = int(data.get("guild_id", 0)) if data.get("guild_id") else None
+        self.channel_id = int(data.get("channel_id", 0)) if data.get("channel_id") else None
+        self.member = Member(data.get("member", {}), client) if data.get("member") else None
+        self.user = User(data.get("user", {}), client) if data.get("user") else None
+        self.data = data.get("data", {})
+        self.message = Message(data.get("message", {}), client) if data.get("message") else None
+        
+        # Для Modal
+        self.custom_id = self.data.get("custom_id", "") if self.data else ""
+        self.components = self.data.get("components", []) if self.data else []
+    
+    @property
+    def guild(self) -> Optional[Guild]:
+        """Получить гильдию"""
+        if self._client and self.guild_id:
+            return self._client.get_guild(self.guild_id)
+        return None
+    
+    @property
+    def channel(self) -> Optional[Channel]:
+        """Получить канал"""
+        if self._client and self.channel_id:
+            return self._client.get_channel(self.channel_id)
+        return None
+    
+    def get_modal_value(self, custom_id: str) -> Optional[str]:
+        """Получить значение поля модального окна по custom_id"""
+        if self.type != InteractionType.MODAL_SUBMIT:
+            return None
+        
+        for row in self.components:
+            if row.get("type") == 1:  # ACTION_ROW
+                for component in row.get("components", []):
+                    if component.get("custom_id") == custom_id:
+                        return component.get("value")
+        return None
+    
+    async def respond(
+        self,
+        content: Optional[str] = None,
+        embeds: Optional[List[Dict]] = None,
+        components: Optional[List[Dict]] = None,
+        ephemeral: bool = False,
+        files: Optional[List] = None
+    ):
+        """Ответить на interaction"""
+        if not self._client or not self._client.http:
+            raise ValueError("Client or HTTP client not available")
+        
+        response_type = InteractionResponseType.CHANNEL_MESSAGE_WITH_SOURCE
+        data = {}
+        
+        if content is not None:
+            data["content"] = content
+        if embeds:
+            data["embeds"] = embeds
+        if components:
+            data["components"] = components
+        if ephemeral:
+            data["flags"] = 64  # EPHEMERAL flag
+        
+        return await self._client.http.create_interaction_response(
+            self.id,
+            self.token,
+            response_type,
+            data,
+            files
+        )
+    
+    async def respond_modal(
+        self,
+        custom_id: str,
+        title: str,
+        components: List[Dict]
+    ):
+        """Ответить модальным окном"""
+        if not self._client or not self._client.http:
+            raise ValueError("Client or HTTP client not available")
+        
+        data = {
+            "custom_id": custom_id,
+            "title": title,
+            "components": components
+        }
+        
+        return await self._client.http.create_interaction_response(
+            self.id,
+            self.token,
+            InteractionResponseType.MODAL,
+            data
+        )
+    
+    def __repr__(self) -> str:
+        return f"<Interaction id={self.id} type={self.type.name}>"
+
+
+class AutoModAction(BaseModel):
+    """Модель действия AutoMod"""
+    
+    def __init__(self, data: Dict, client=None):
+        super().__init__(data, client)
+        self.guild_id = int(data.get("guild_id", 0))
+        self.action = data.get("action", {})
+        self.rule_id = int(data.get("rule_id", 0))
+        self.rule_trigger_type = data.get("rule_trigger_type", 0)
+        self.user_id = int(data.get("user_id", 0)) if data.get("user_id") else None
+        self.channel_id = int(data.get("channel_id", 0)) if data.get("channel_id") else None
+        self.message_id = int(data.get("message_id", 0)) if data.get("message_id") else None
+        self.alert_system_message_id = int(data.get("alert_system_message_id", 0)) if data.get("alert_system_message_id") else None
+        self.content = data.get("content", "")
+        self.matched_keyword = data.get("matched_keyword")
+        self.matched_content = data.get("matched_content")
+    
+    @property
+    def guild(self) -> Optional[Guild]:
+        """Получить гильдию"""
+        if self._client and self.guild_id:
+            return self._client.get_guild(self.guild_id)
+        return None
+    
+    @property
+    def channel(self) -> Optional[Channel]:
+        """Получить канал"""
+        if self._client and self.channel_id:
+            return self._client.get_channel(self.channel_id)
+        return None
+    
+    @property
+    def user(self) -> Optional[User]:
+        """Получить пользователя"""
+        if self._client and self.user_id:
+            return self._client.get_user(self.user_id)
+        return None
+    
+    def __repr__(self) -> str:
+        return f"<AutoModAction guild_id={self.guild_id} rule_id={self.rule_id}>"
+
+
+class AutoModRule(BaseModel):
+    """Модель правила AutoMod"""
+    
+    def __init__(self, data: Dict, client=None):
+        super().__init__(data, client)
+        self.id = int(data.get("id", 0))
+        self.guild_id = int(data.get("guild_id", 0))
+        self.name = data.get("name", "")
+        self.creator_id = int(data.get("creator_id", 0)) if data.get("creator_id") else None
+        self.event_type = data.get("event_type", 0)
+        self.trigger_type = data.get("trigger_type", 0)
+        self.trigger_metadata = data.get("trigger_metadata", {})
+        self.actions = data.get("actions", [])
+        self.enabled = data.get("enabled", True)
+        self.exempt_roles = [int(r) for r in data.get("exempt_roles", [])]
+        self.exempt_channels = [int(c) for c in data.get("exempt_channels", [])]
+    
+    @property
+    def guild(self) -> Optional[Guild]:
+        """Получить гильдию"""
+        if self._client and self.guild_id:
+            return self._client.get_guild(self.guild_id)
+        return None
+    
+    def __repr__(self) -> str:
+        return f"<AutoModRule id={self.id} name={self.name}>"
+
+
+class Attachment(BaseModel):
+    """Модель вложения (Attachment)"""
+    
+    def __init__(self, data: Dict, client=None):
+        super().__init__(data, client)
+        self.id = int(data.get("id", 0))
+        self.filename = data.get("filename", "")
+        self.description = data.get("description")
+        self.content_type = data.get("content_type")
+        self.size = data.get("size", 0)
+        self.url = data.get("url", "")
+        self.proxy_url = data.get("proxy_url", "")
+        self.height = data.get("height")
+        self.width = data.get("width")
+        self.ephemeral = data.get("ephemeral", False)
+        self.duration_seconds = data.get("duration_seconds")
+        self.waveform = data.get("waveform")
+    
+    @property
+    def is_image(self) -> bool:
+        """Проверить, является ли вложение изображением"""
+        return self.content_type and self.content_type.startswith("image/")
+    
+    @property
+    def is_video(self) -> bool:
+        """Проверить, является ли вложение видео"""
+        return self.content_type and self.content_type.startswith("video/")
+    
+    @property
+    def is_audio(self) -> bool:
+        """Проверить, является ли вложение аудио"""
+        return self.content_type and self.content_type.startswith("audio/")
+    
+    def __repr__(self) -> str:
+        return f"<Attachment id={self.id} filename={self.filename} size={self.size}>"
+
+
+class Invite(BaseModel):
+    """Модель приглашения (Invite)"""
+    
+    def __init__(self, data: Dict, client=None):
+        super().__init__(data, client)
+        self.code = data.get("code", "")
+        self.guild_id = int(data.get("guild_id", 0)) if data.get("guild_id") else None
+        self.guild = Guild(data.get("guild", {}), client) if data.get("guild") else None
+        self.channel_id = int(data.get("channel_id", 0)) if data.get("channel_id") else None
+        self.channel = Channel(data.get("channel", {}), client) if data.get("channel") else None
+        self.inviter = User(data.get("inviter", {}), client) if data.get("inviter") else None
+        self.target_type = data.get("target_type")
+        self.target_user = User(data.get("target_user", {}), client) if data.get("target_user") else None
+        self.target_application = data.get("target_application")
+        self.approximate_presence_count = data.get("approximate_presence_count")
+        self.approximate_member_count = data.get("approximate_member_count")
+        self.expires_at = data.get("expires_at")
+        self.stage_instance = data.get("stage_instance")
+        self.guild_scheduled_event = data.get("guild_scheduled_event")
+        self.uses = data.get("uses", 0)
+        self.max_uses = data.get("max_uses", 0)
+        self.max_age = data.get("max_age", 0)
+        self.temporary = data.get("temporary", False)
+        self.created_at = data.get("created_at")
+    
+    @property
+    def url(self) -> str:
+        """Получить URL приглашения"""
+        return f"https://discord.gg/{self.code}"
+    
+    def __repr__(self) -> str:
+        return f"<Invite code={self.code} guild_id={self.guild_id}>"
+
+
+class Integration(BaseModel):
+    """Модель интеграции (Integration)"""
+    
+    def __init__(self, data: Dict, client=None):
+        super().__init__(data, client)
+        self.id = int(data.get("id", 0))
+        self.name = data.get("name", "")
+        self.type = data.get("type", "")
+        self.enabled = data.get("enabled", False)
+        self.syncing = data.get("syncing", False)
+        self.role_id = int(data.get("role_id", 0)) if data.get("role_id") else None
+        self.enable_emoticons = data.get("enable_emoticons", False)
+        self.expire_behavior = data.get("expire_behavior", 0)
+        self.expire_grace_period = data.get("expire_grace_period", 0)
+        self.user = User(data.get("user", {}), client) if data.get("user") else None
+        self.account = data.get("account", {})
+        self.synced_at = data.get("synced_at")
+        self.subscriber_count = data.get("subscriber_count", 0)
+        self.revoked = data.get("revoked", False)
+        self.application = data.get("application", {})
+        self.scopes = data.get("scopes", [])
+    
+    @property
+    def guild(self) -> Optional[Guild]:
+        """Получить гильдию"""
+        # Integration обычно привязана к гильдии через client
+        return None
+    
+    def __repr__(self) -> str:
+        return f"<Integration id={self.id} name={self.name} type={self.type}>"
+
+
+class StageInstance(BaseModel):
+    """Модель Stage Instance"""
+    
+    def __init__(self, data: Dict, client=None):
+        super().__init__(data, client)
+        self.id = int(data.get("id", 0))
+        self.guild_id = int(data.get("guild_id", 0))
+        self.channel_id = int(data.get("channel_id", 0))
+        self.topic = data.get("topic", "")
+        self.privacy_level = data.get("privacy_level", 1)
+        self.discoverable_disabled = data.get("discoverable_disabled", False)
+        self.guild_scheduled_event_id = int(data.get("guild_scheduled_event_id", 0)) if data.get("guild_scheduled_event_id") else None
+    
+    @property
+    def guild(self) -> Optional[Guild]:
+        """Получить гильдию"""
+        if self._client and self.guild_id:
+            return self._client.get_guild(self.guild_id)
+        return None
+    
+    @property
+    def channel(self) -> Optional[Channel]:
+        """Получить канал"""
+        if self._client and self.channel_id:
+            return self._client.get_channel(self.channel_id)
+        return None
+    
+    def __repr__(self) -> str:
+        return f"<StageInstance id={self.id} topic={self.topic}>"
+
+
+class ScheduledEvent(BaseModel):
+    """Модель Scheduled Event"""
+    
+    def __init__(self, data: Dict, client=None):
+        super().__init__(data, client)
+        self.id = int(data.get("id", 0))
+        self.guild_id = int(data.get("guild_id", 0))
+        self.channel_id = int(data.get("channel_id", 0)) if data.get("channel_id") else None
+        self.creator_id = int(data.get("creator_id", 0)) if data.get("creator_id") else None
+        self.name = data.get("name", "")
+        self.description = data.get("description")
+        self.scheduled_start_time = data.get("scheduled_start_time")
+        self.scheduled_end_time = data.get("scheduled_end_time")
+        self.privacy_level = data.get("privacy_level", 2)
+        self.status = data.get("status", 1)
+        self.entity_type = data.get("entity_type", 0)
+        self.entity_id = int(data.get("entity_id", 0)) if data.get("entity_id") else None
+        self.entity_metadata = data.get("entity_metadata", {})
+        self.creator = User(data.get("creator", {}), client) if data.get("creator") else None
+        self.user_count = data.get("user_count", 0)
+        self.image = data.get("image")
+    
+    @property
+    def guild(self) -> Optional[Guild]:
+        """Получить гильдию"""
+        if self._client and self.guild_id:
+            return self._client.get_guild(self.guild_id)
+        return None
+    
+    @property
+    def channel(self) -> Optional[Channel]:
+        """Получить канал"""
+        if self._client and self.channel_id:
+            return self._client.get_channel(self.channel_id)
+        return None
+    
+    def __repr__(self) -> str:
+        return f"<ScheduledEvent id={self.id} name={self.name}>"
 

@@ -2,6 +2,8 @@
 
 Полнофункциональная библиотека для создания Discord selfbot на Python.
 
+> 📚 **Полная документация**: [docs/README.md](docs/README.md)
+
 ## Возможности
 
 - ✅ **REST API** - Полная поддержка Discord REST API
@@ -299,11 +301,34 @@ discordself/
 - `channel_update` - Обновление канала
 - `channel_delete` - Удаление канала
 
+## Документация
+
+Полная документация доступна в папке [docs/](docs/):
+
+- [Начало работы](docs/getting-started.md)
+- [API Reference](docs/api-reference.md)
+- [Руководства](docs/guides/)
+  - [Система команд](docs/guides/commands.md)
+  - [Голосовые функции](docs/guides/voice.md)
+  - [Работа с событиями](docs/guides/events.md)
+  - [Embeds и компоненты](docs/guides/embeds.md)
+  - [Cogs](docs/guides/cogs.md)
+  - [Modals](docs/guides/modals.md)
+  - [AutoMod](docs/guides/automod.md)
+  - [Threads](docs/guides/threads.md)
+  - [Webhooks](docs/guides/webhooks.md)
+  - [Permissions](docs/guides/permissions.md)
+- [Примеры](docs/examples/)
+- [FAQ](docs/faq.md)
+- [Changelog](docs/changelog.md)
+
 ## Лицензия
 
 MIT License
 
 ## Важное замечание
 
-Использование selfbot нарушает Terms of Service Discord. Используйте на свой риск.
+⚠️ **Использование selfbot нарушает Terms of Service Discord. Используйте на свой риск.**
+
+DiscordSelf предназначен только для образовательных целей и автоматизации личного аккаунта. Не используйте для спама, нарушения правил Discord или любых других незаконных действий.
 

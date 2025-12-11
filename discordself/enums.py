@@ -82,3 +82,42 @@ class GatewayOpcode(IntEnum):
     HELLO = 10
     HEARTBEAT_ACK = 11
 
+
+class InteractionType(IntEnum):
+    """Тип interaction"""
+    PING = 1
+    APPLICATION_COMMAND = 2
+    MESSAGE_COMPONENT = 3
+    APPLICATION_COMMAND_AUTOCOMPLETE = 4
+    MODAL_SUBMIT = 5
+
+
+class InteractionResponseType(IntEnum):
+    """Тип ответа на interaction"""
+    PONG = 1
+    CHANNEL_MESSAGE_WITH_SOURCE = 4
+    DEFERRED_CHANNEL_MESSAGE_WITH_SOURCE = 5
+    DEFERRED_UPDATE_MESSAGE = 6
+    UPDATE_MESSAGE = 7
+    APPLICATION_COMMAND_AUTOCOMPLETE_RESULT = 8
+    MODAL = 9
+
+
+class AutoModEventType(IntEnum):
+    """Тип события AutoMod"""
+    MESSAGE_SEND = 1
+
+
+class AutoModTriggerType(IntEnum):
+    """Тип триггера AutoMod"""
+    KEYWORD = 1
+    SPAM = 3
+    KEYWORD_PRESET = 4
+    MENTION_SPAM = 5
+
+
+class AutoModActionType(IntEnum):
+    """Тип действия AutoMod"""
+    BLOCK_MESSAGE = 1
+    SEND_ALERT_MESSAGE = 2
+    TIMEOUT = 3

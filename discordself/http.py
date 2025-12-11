@@ -1170,4 +1170,361 @@ class HTTPClient:
         if limit:
             params["limit"] = limit
         return await self.request("GET", f"/channels/{channel_id}/users/@me/threads/archived/private", params=params)
+    
+    # ========== Методы для работы с AutoMod ==========
+    
+    async def get_automod_rules(self, guild_id: int) -> List[Dict]:
+        """Получить все правила AutoMod гильдии"""
+        return await self.request("GET", f"/guilds/{guild_id}/auto-moderation/rules")
+    
+    async def get_automod_rule(self, guild_id: int, rule_id: int) -> Dict:
+        """Получить правило AutoMod по ID"""
+        return await self.request("GET", f"/guilds/{guild_id}/auto-moderation/rules/{rule_id}")
+    
+    async def create_automod_rule(
+        self,
+        guild_id: int,
+        name: str,
+        event_type: int,
+        trigger_type: int,
+        trigger_metadata: Optional[Dict] = None,
+        actions: Optional[List[Dict]] = None,
+        enabled: bool = True,
+        exempt_roles: Optional[List[int]] = None,
+        exempt_channels: Optional[List[int]] = None
+    ) -> Dict:
+        """Создать правило AutoMod"""
+        data = {
+            "name": name,
+            "event_type": event_type,
+            "trigger_type": trigger_type,
+            "enabled": enabled
+        }
+        if trigger_metadata:
+            data["trigger_metadata"] = trigger_metadata
+        if actions:
+            data["actions"] = actions
+        if exempt_roles:
+            data["exempt_roles"] = exempt_roles
+        if exempt_channels:
+            data["exempt_channels"] = exempt_channels
+        return await self.request("POST", f"/guilds/{guild_id}/auto-moderation/rules", json=data)
+    
+    async def modify_automod_rule(
+        self,
+        guild_id: int,
+        rule_id: int,
+        name: Optional[str] = None,
+        event_type: Optional[int] = None,
+        trigger_metadata: Optional[Dict] = None,
+        actions: Optional[List[Dict]] = None,
+        enabled: Optional[bool] = None,
+        exempt_roles: Optional[List[int]] = None,
+        exempt_channels: Optional[List[int]] = None
+    ) -> Dict:
+        """Изменить правило AutoMod"""
+        data = {}
+        if name is not None:
+            data["name"] = name
+        if event_type is not None:
+            data["event_type"] = event_type
+        if trigger_metadata is not None:
+            data["trigger_metadata"] = trigger_metadata
+        if actions is not None:
+            data["actions"] = actions
+        if enabled is not None:
+            data["enabled"] = enabled
+        if exempt_roles is not None:
+            data["exempt_roles"] = exempt_roles
+        if exempt_channels is not None:
+            data["exempt_channels"] = exempt_channels
+        return await self.request("PATCH", f"/guilds/{guild_id}/auto-moderation/rules/{rule_id}", json=data)
+    
+    async def delete_automod_rule(self, guild_id: int, rule_id: int):
+        """Удалить правило AutoMod"""
+        return await self.request("DELETE", f"/guilds/{guild_id}/auto-moderation/rules/{rule_id}")
+    
+    # ========== Методы для работы с Interactions (Modals) ==========
+    
+    async def create_interaction_response(
+        self,
+        interaction_id: int,
+        interaction_token: str,
+        response_type: int,
+        data: Optional[Dict] = None,
+        files: Optional[List] = None
+    ) -> Dict:
+        """Создать ответ на interaction (включая modal)"""
+        payload = {
+            "type": response_type
+        }
+        if data:
+            payload["data"] = data
+        
+        if files:
+            # Multipart form data для файлов
+            form_data = aiohttp.FormData()
+            form_data.add_field("payload_json", json.dumps(payload))
+            for i, file in enumerate(files):
+                form_data.add_field(f"files[{i}]", file["data"], filename=file.get("filename", "file"))
+            return await self.request(
+                "POST",
+                f"/interactions/{interaction_id}/{interaction_token}/callback",
+                data=form_data,
+                headers={"Content-Type": None}  # aiohttp установит правильный Content-Type
+            )
+        else:
+            return await self.request(
+                "POST",
+                f"/interactions/{interaction_id}/{interaction_token}/callback",
+                json=payload
+            )
+    
+    async def get_original_interaction_response(
+        self,
+        application_id: int,
+        interaction_token: str
+    ) -> Dict:
+        """Получить оригинальный ответ на interaction"""
+        return await self.request("GET", f"/webhooks/{application_id}/{interaction_token}/messages/@original")
+    
+    async def edit_original_interaction_response(
+        self,
+        application_id: int,
+        interaction_token: str,
+        content: Optional[str] = None,
+        embeds: Optional[List[Dict]] = None,
+        components: Optional[List[Dict]] = None,
+        files: Optional[List] = None
+    ) -> Dict:
+        """Редактировать оригинальный ответ на interaction"""
+        data = {}
+        if content is not None:
+            data["content"] = content
+        if embeds is not None:
+            data["embeds"] = embeds
+        if components is not None:
+            data["components"] = components
+        
+        if files:
+            form_data = aiohttp.FormData()
+            form_data.add_field("payload_json", json.dumps(data))
+            for i, file in enumerate(files):
+                form_data.add_field(f"files[{i}]", file["data"], filename=file.get("filename", "file"))
+            return await self.request(
+                "PATCH",
+                f"/webhooks/{application_id}/{interaction_token}/messages/@original",
+                data=form_data,
+                headers={"Content-Type": None}
+            )
+        else:
+            return await self.request(
+                "PATCH",
+                f"/webhooks/{application_id}/{interaction_token}/messages/@original",
+                json=data
+            )
+    
+    async def delete_original_interaction_response(
+        self,
+        application_id: int,
+        interaction_token: str
+    ):
+        """Удалить оригинальный ответ на interaction"""
+        return await self.request("DELETE", f"/webhooks/{application_id}/{interaction_token}/messages/@original")
+    
+    # ========== Методы для работы с Invites ==========
+    
+    async def get_invite(self, code: str, with_counts: bool = False, with_expiration: bool = False) -> Dict:
+        """Получить приглашение по коду"""
+        params = {}
+        if with_counts:
+            params["with_counts"] = "true"
+        if with_expiration:
+            params["with_expiration"] = "true"
+        return await self.request("GET", f"/invites/{code}", params=params)
+    
+    async def delete_invite(self, code: str) -> Dict:
+        """Удалить приглашение"""
+        return await self.request("DELETE", f"/invites/{code}")
+    
+    # ========== Методы для работы с Integrations ==========
+    
+    async def get_guild_integrations(self, guild_id: int) -> List[Dict]:
+        """Получить все интеграции гильдии"""
+        return await self.request("GET", f"/guilds/{guild_id}/integrations")
+    
+    async def delete_guild_integration(self, guild_id: int, integration_id: int):
+        """Удалить интеграцию гильдии"""
+        return await self.request("DELETE", f"/guilds/{guild_id}/integrations/{integration_id}")
+    
+    async def modify_guild_integration(
+        self,
+        guild_id: int,
+        integration_id: int,
+        expire_behavior: Optional[int] = None,
+        expire_grace_period: Optional[int] = None,
+        enable_emoticons: Optional[bool] = None
+    ) -> Dict:
+        """Изменить интеграцию гильдии"""
+        data = {}
+        if expire_behavior is not None:
+            data["expire_behavior"] = expire_behavior
+        if expire_grace_period is not None:
+            data["expire_grace_period"] = expire_grace_period
+        if enable_emoticons is not None:
+            data["enable_emoticons"] = enable_emoticons
+        return await self.request("PATCH", f"/guilds/{guild_id}/integrations/{integration_id}", json=data)
+    
+    # ========== Методы для работы с Stage Instances ==========
+    
+    async def get_stage_instance(self, channel_id: int) -> Dict:
+        """Получить Stage Instance по ID канала"""
+        return await self.request("GET", f"/stage-instances/{channel_id}")
+    
+    async def create_stage_instance(
+        self,
+        channel_id: int,
+        topic: str,
+        privacy_level: int = 1,
+        guild_scheduled_event_id: Optional[int] = None
+    ) -> Dict:
+        """Создать Stage Instance"""
+        data = {
+            "channel_id": channel_id,
+            "topic": topic,
+            "privacy_level": privacy_level
+        }
+        if guild_scheduled_event_id:
+            data["guild_scheduled_event_id"] = guild_scheduled_event_id
+        return await self.request("POST", "/stage-instances", json=data)
+    
+    async def modify_stage_instance(
+        self,
+        channel_id: int,
+        topic: Optional[str] = None,
+        privacy_level: Optional[int] = None
+    ) -> Dict:
+        """Изменить Stage Instance"""
+        data = {}
+        if topic is not None:
+            data["topic"] = topic
+        if privacy_level is not None:
+            data["privacy_level"] = privacy_level
+        return await self.request("PATCH", f"/stage-instances/{channel_id}", json=data)
+    
+    async def delete_stage_instance(self, channel_id: int):
+        """Удалить Stage Instance"""
+        return await self.request("DELETE", f"/stage-instances/{channel_id}")
+    
+    # ========== Методы для работы с Scheduled Events ==========
+    
+    async def list_scheduled_events(self, guild_id: int, with_user_count: bool = False) -> List[Dict]:
+        """Получить все Scheduled Events гильдии"""
+        params = {}
+        if with_user_count:
+            params["with_user_count"] = "true"
+        return await self.request("GET", f"/guilds/{guild_id}/scheduled-events", params=params)
+    
+    async def get_scheduled_event(self, guild_id: int, event_id: int, with_user_count: bool = False) -> Dict:
+        """Получить Scheduled Event по ID"""
+        params = {}
+        if with_user_count:
+            params["with_user_count"] = "true"
+        return await self.request("GET", f"/guilds/{guild_id}/scheduled-events/{event_id}", params=params)
+    
+    async def create_scheduled_event(
+        self,
+        guild_id: int,
+        name: str,
+        scheduled_start_time: str,
+        entity_type: int,
+        channel_id: Optional[int] = None,
+        entity_metadata: Optional[Dict] = None,
+        scheduled_end_time: Optional[str] = None,
+        description: Optional[str] = None,
+        privacy_level: int = 2,
+        image: Optional[str] = None
+    ) -> Dict:
+        """Создать Scheduled Event"""
+        data = {
+            "name": name,
+            "scheduled_start_time": scheduled_start_time,
+            "entity_type": entity_type,
+            "privacy_level": privacy_level
+        }
+        if channel_id:
+            data["channel_id"] = channel_id
+        if entity_metadata:
+            data["entity_metadata"] = entity_metadata
+        if scheduled_end_time:
+            data["scheduled_end_time"] = scheduled_end_time
+        if description:
+            data["description"] = description
+        if image:
+            data["image"] = image
+        return await self.request("POST", f"/guilds/{guild_id}/scheduled-events", json=data)
+    
+    async def modify_scheduled_event(
+        self,
+        guild_id: int,
+        event_id: int,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        scheduled_start_time: Optional[str] = None,
+        scheduled_end_time: Optional[str] = None,
+        entity_type: Optional[int] = None,
+        channel_id: Optional[int] = None,
+        entity_metadata: Optional[Dict] = None,
+        privacy_level: Optional[int] = None,
+        status: Optional[int] = None,
+        image: Optional[str] = None
+    ) -> Dict:
+        """Изменить Scheduled Event"""
+        data = {}
+        if name is not None:
+            data["name"] = name
+        if description is not None:
+            data["description"] = description
+        if scheduled_start_time is not None:
+            data["scheduled_start_time"] = scheduled_start_time
+        if scheduled_end_time is not None:
+            data["scheduled_end_time"] = scheduled_end_time
+        if entity_type is not None:
+            data["entity_type"] = entity_type
+        if channel_id is not None:
+            data["channel_id"] = channel_id
+        if entity_metadata is not None:
+            data["entity_metadata"] = entity_metadata
+        if privacy_level is not None:
+            data["privacy_level"] = privacy_level
+        if status is not None:
+            data["status"] = status
+        if image is not None:
+            data["image"] = image
+        return await self.request("PATCH", f"/guilds/{guild_id}/scheduled-events/{event_id}", json=data)
+    
+    async def delete_scheduled_event(self, guild_id: int, event_id: int):
+        """Удалить Scheduled Event"""
+        return await self.request("DELETE", f"/guilds/{guild_id}/scheduled-events/{event_id}")
+    
+    async def get_scheduled_event_users(
+        self,
+        guild_id: int,
+        event_id: int,
+        limit: Optional[int] = None,
+        with_member: bool = False,
+        before: Optional[int] = None,
+        after: Optional[int] = None
+    ) -> List[Dict]:
+        """Получить пользователей, заинтересованных в Scheduled Event"""
+        params = {}
+        if limit:
+            params["limit"] = limit
+        if with_member:
+            params["with_member"] = "true"
+        if before:
+            params["before"] = before
+        if after:
+            params["after"] = after
+        return await self.request("GET", f"/guilds/{guild_id}/scheduled-events/{event_id}/users", params=params)
 

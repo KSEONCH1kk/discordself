@@ -3,8 +3,8 @@ Discord Selfbot Library - Полнофункциональная библиот�
 """
 
 from .client import Client
-from .models import User, Guild, Channel, Message, Member, Role, Emoji, VoiceState
-from .enums import Status, ActivityType
+from .models import User, Guild, Channel, Message, Member, Role, Emoji, VoiceState, Interaction, AutoModAction, AutoModRule, Attachment, Invite, Integration, StageInstance, ScheduledEvent
+from .enums import Status, ActivityType, InteractionType, InteractionResponseType, AutoModEventType, AutoModTriggerType, AutoModActionType
 from .embeds import Embed, Button, SelectMenu, ActionRow, create_embed, create_button, create_select_menu, create_action_row
 from .webhook import Webhook
 from .intents import Intents
@@ -136,9 +136,22 @@ __all__ = [
     'Role',
     'Emoji',
     'VoiceState',
+    'Interaction',
+    'AutoModAction',
+    'AutoModRule',
+    'Attachment',
+    'Invite',
+    'Integration',
+    'StageInstance',
+    'ScheduledEvent',
     # Enums
     'Status',
     'ActivityType',
+    'InteractionType',
+    'InteractionResponseType',
+    'AutoModEventType',
+    'AutoModTriggerType',
+    'AutoModActionType',
     # Embeds
     'Embed',
     'Button',

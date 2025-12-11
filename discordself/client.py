@@ -7,7 +7,7 @@ from .http import HTTPClient
 from .gateway import GatewayClient
 from .shard import ShardManager
 from .cache import CacheManager
-from .models import User, Guild, Channel, Message, Member, Role, Emoji
+from .models import User, Guild, Channel, Message, Member, Role, Emoji, Interaction
 from .exceptions import LoginFailure
 from .enums import Status, ActivityType
 
@@ -237,6 +237,8 @@ class Client:
         self.shard_manager.register_event_handler("MESSAGE_DELETE", self._on_message_delete)
         self.shard_manager.register_event_handler("VOICE_STATE_UPDATE", self._on_voice_state_update)
         self.shard_manager.register_event_handler("VOICE_SERVER_UPDATE", self._on_voice_server_update)
+        self.shard_manager.register_event_handler("INTERACTION_CREATE", self._on_interaction_create)
+        self.shard_manager.register_event_handler("AUTO_MODERATION_ACTION_EXECUTION", self._on_automod_action_execution)
     
     async def _on_ready(self, data: Dict):
         """Обработчик события READY"""
@@ -425,6 +427,33 @@ class Client:
             logger.warning(f"⚠️ VOICE_SERVER_UPDATE received but no voice client for guild {guild_id}")
         
         self.dispatch("voice_server_update", data)
+    
+    async def _on_interaction_create(self, data: Dict):
+        """Обработчик события INTERACTION_CREATE (включая Modals)"""
+        from .enums import InteractionType
+        
+        interaction_type = data.get("type", 0)
+        
+        # Создать объект Interaction
+        interaction = Interaction(data, self)
+        
+        # Диспатчить общее событие
+        self.dispatch("interaction_create", interaction)
+        
+        # Диспатчить специфичные события
+        if interaction_type == InteractionType.MODAL_SUBMIT:
+            self.dispatch("modal_submit", interaction)
+        elif interaction_type == InteractionType.MESSAGE_COMPONENT:
+            self.dispatch("component_interaction", interaction)
+        elif interaction_type == InteractionType.APPLICATION_COMMAND:
+            self.dispatch("application_command", interaction)
+    
+    async def _on_automod_action_execution(self, data: Dict):
+        """Обработчик события AUTO_MODERATION_ACTION_EXECUTION"""
+        from .models import AutoModAction
+        
+        action = AutoModAction(data, self)
+        self.dispatch("automod_action_execution", action)
     
     async def start(self):
         """Запустить клиент"""
